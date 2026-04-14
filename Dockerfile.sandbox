@@ -1,0 +1,45 @@
+ARG PACKAGES=" \
+  openssh-server \
+  lsb-release bash coreutils findutils grep sed gawk diffutils patch file tree \
+  git git-lfs gh \
+  curl wget \
+  nmap iputils-ping iproute2 netcat-openbsd dnsutils \
+  openssh-client rsync \
+  build-essential make cmake ninja-build \
+  autoconf automake autotools-dev libtool pkg-config \
+  gcc g++ gdb valgrind clang clang-format \
+  python3 python3-pip python3-venv python3-dev black pylint \
+  php-cli php-mbstring php-xml php-curl php-zip composer \
+  nodejs npm \
+  ruby ruby-dev \
+  golang \
+  rustc cargo \
+  graphviz plantuml pandoc \
+  ffmpeg imagemagick \
+  texlive-latex-base texlive-fonts-recommended \
+  zip unzip xz-utils bzip2 \
+  jq yq ripgrep fd-find \
+  shellcheck \
+  sqlite3 \
+  docker.io \
+  procps ca-certificates gnupg apt-transport-https \
+  locales pwgen \
+  "
+ARG CONFIGURATION_COMMANDS=" \
+  sed -i \
+  -e 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' \
+  -e 's/^#*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' \
+  -e 's/^#*UsePAM.*/UsePAM no/' \
+  -e 's/^#*PermitRootLogin.*/PermitRootLogin no/' \
+  /etc/ssh/sshd_config \
+  && mkdir -p /run/sshd \
+  "
+FROM mwaeckerlin/ubuntu-base AS build
+ENV CONTAINERNAME    "openclaw"
+ADD files/sandbox-entrypoint.sh /entrypoint.sh
+RUN install -d -m 700 -o ${RUN_USER} -g ${RUN_GROUP} ${RUN_HOME}/.ssh
+EXPOSE 22
+ENTRYPOINT ["/entrypoint.sh"]
+
+FROM build
+USER root
