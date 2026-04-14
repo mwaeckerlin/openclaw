@@ -1,0 +1,21 @@
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openai/gpt-5.4"
+      },
+      "sandbox": {
+        "mode": "all",
+        "backend": "ssh",
+        "scope": "session",
+        "workspaceAccess": "rw",
+        "ssh": {
+          "target": "somebody@openclaw-sandbox:22",
+          "workspaceRoot": "/home/somebody/workspaces",
+          "strictHostKeyChecking": false,
+          "identityFile": "/home/node/.ssh/id_ed25519"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+services:
+  openclaw-gateway:
+    image: mwaeckerlin/openclaw-gateway
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    depends_on:
+      openclaw-sandbox:
+        condition: service_healthy
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      PRIVATE_KEY: ${PRIVATE_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
+    ports:
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+      - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - openclaw
+
+  openclaw-sandbox:
+    image: mwaeckerlin/openclaw-sandbox
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+    environment:
+      AUTHORIZED_KEY: ${AUTHORIZED_KEY:-}
+    volumes:
+      - openclaw-workspace:/home/somebody
+    healthcheck:
+      test: ["CMD", "pgrep", "-x", "sshd"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - openclaw
+
+networks:
+  openclaw:
+
+volumes:
+  openclaw-config:
+  openclaw-workspace:
