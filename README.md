@@ -18,6 +18,7 @@ All further measures reinforce this model:
 - **No port over-exposure** — Only port 18789 (UI/API) is published; internal ports stay internal
 - **Container hardening** — `no-new-privileges`, `pids_limit: 256` against escalation and fork bombs
 - **Network isolation** — Containers communicate on an internal Docker network only
+- **Docker-in-Docker isolation** — Sandbox uses a dedicated Docker daemon (`docker:dind`), no access to host Docker
 - **Secrets + encrypted networks for production** — Docker Secrets instead of ENV, encrypted overlay in Swarm
 
 ### What `workspaceOnly` Does NOT Protect
@@ -120,12 +121,35 @@ Entrypoints automatically read from `/run/secrets/` when environment variables a
 
 ## Architecture
 
-```
-┌─────────────────────────────┐     SSH (key auth)     ┌──────────────────────┐
-│  openclaw-gateway           │ ──────────────────────▶ │  openclaw-sandbox    │
-│  alpine/openclaw:latest     │                         │  ubuntu-base + tools │
-│  port 18789 (UI + API)      │                         │  sshd :22            │
-│  USER node (1000)           │                         │  USER root (sshd)    │
-└─────────────────────────────┘                         │  login: somebody     │
-                                                        └──────────────────────┘
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+
+actor User as user
+
+node "openclaw:gateway" as gw {
+  [Control Plane\nLLM Proxy\nWeb UI] as ctrl
+  storage "openclaw-config" as cfg
+  ctrl - cfg
+}
+
+node "openclaw:sandbox" as sb {
+  [sshd :22\nlogin: somebody] as sshd
+  storage "openclaw-workspace" as ws
+  sshd -left- ws
+}
+
+node "openclaw-dind" as dind {
+  [Docker Daemon] as dd
+  storage "openclaw-docker" as dv
+  dd -right- dv
+}
+
+component "allow-write-access" as aw
+
+user --> ctrl : "HTTP :18789"
+ctrl --> sshd : "SSH (key auth)"
+sshd -right-> dd : "DOCKER_HOST\ntcp://openclaw-dind:2375"
+aw .left.> cfg : "chown"
+@enduml
 ```
