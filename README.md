@@ -1,6 +1,11 @@
-# OpenClaw
+# OpenClaw — Gateway + SSH sandbox for OpenClaw.
 
-Gateway + SSH sandbox for OpenClaw.
+Run OpenClaw in a secure environement. OpenClaw runs sandboxed in Docker containers:
+
+ - `gateway`: The controlling process of OpenClaw.
+ - `sandbox`: Ubuntu instance where the AI can run commands.
+
+ The controlling instance `gateway` acesses `sandbox` as worker node through `ssh` and runs AI requests as unpriviledged user `somebody`.
 
 ## Setup
 
@@ -16,7 +21,7 @@ EOF
 rm openclaw-key.pub
 ```
 
-The private key file `openclaw-key` stays in this directory (mounted into the gateway container).
+You must set `OPENAI_API_KEY` to access ChatGPT as AI Agent. Get a key at https://platform.openai.com/api-keys — sory, this is the part you need to pay for.
 
 Alternatively use Docker Secrets instead of environment variables (see below).
 

@@ -7,6 +7,8 @@ services:
     depends_on:
       openclaw-sandbox:
         condition: service_healthy
+      allow-write-access:
+        condition: service_started
     environment:
       HOME: /home/node
       TERM: xterm-256color
@@ -51,6 +53,13 @@ services:
     restart: unless-stopped
     networks:
       - openclaw
+
+  allow-write-access:
+    image: mwaeckerlin/allow-write-access
+    environment:
+      ALLOW_USER: "chown -R 1000:1000"
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/app
 
 networks:
   openclaw:
