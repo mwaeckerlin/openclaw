@@ -1,72 +1,131 @@
-# OpenClaw — Gateway + SSH sandbox for OpenClaw.
+# OpenClaw — Gateway + SSH Sandbox
 
-Run OpenClaw in a secure environement. OpenClaw runs sandboxed in Docker containers:
+Run OpenClaw in a secure environment. OpenClaw runs sandboxed in Docker containers:
 
- - `gateway`: The controlling process of OpenClaw.
- - `sandbox`: Ubuntu instance where the AI can run commands.
+- **gateway**: Control plane, LLM proxy, web UI (port 18789)
+- **sandbox**: Ubuntu instance where the AI executes commands as unprivileged user `somebody`
 
- The controlling instance `gateway` acesses `sandbox` as worker node through `ssh` and runs AI requests as unpriviledged user `somebody`.
+The gateway accesses the sandbox via SSH key authentication.
 
-## Setup
+## Security Model
 
-### 1. Generate SSH keypair and .env File
+The primary security mechanism is **strict isolation**: The AI runs in a dedicated sandbox container that contains only its tools and workspace — no host secrets, no production data, no unrelated resources.
+
+All further measures reinforce this model:
+
+- **Workspace restriction** (`tools.fs.workspaceOnly: true`) — File tools limited to the sandbox workspace
+- **Loop detection** (`loopDetection`) — Circuit breaker against tool/agent loops (threshold: 10)
+- **No port over-exposure** — Only port 18789 (UI/API) is published; internal ports stay internal
+- **Container hardening** — `no-new-privileges`, `pids_limit: 256` against escalation and fork bombs
+- **Network isolation** — Containers communicate on an internal Docker network only
+- **Secrets + encrypted networks for production** — Docker Secrets instead of ENV, encrypted overlay in Swarm
+
+### What `workspaceOnly` Does NOT Protect
+
+The `workspaceOnly` setting restricts OpenClaw's **file tools** to the workspace. However, `exec`/shell commands can still read container system files (e.g. `/etc/passwd`, `/proc`). This is acceptable because the sandbox is an isolated container — there are no host secrets inside it.
+
+### `strictHostKeyChecking: false`
+
+Acceptable in a controlled internal Docker network where DNS is managed by Docker. For production hardening, consider pinning host keys.
+
+## Development Setup
+
+For local testing with `docker compose` and `.env` file.
+
+### 1. Generate SSH Keypair and .env
 
 ```bash
 ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
 cat > .env <<EOF
 OPENCLAW_GATEWAY_TOKEN=$(pwgen 40 1)
 AUTHORIZED_KEY=$(cat openclaw-key.pub)
+PRIVATE_KEY=$(sed -z 's/\n/\\n/g' openclaw-key)
 OPENAI_API_KEY=sk-...
 EOF
 rm openclaw-key.pub
 ```
 
-You must set `OPENAI_API_KEY` to access ChatGPT as AI Agent. Get a key at https://platform.openai.com/api-keys — sory, this is the part you need to pay for.
+Set `OPENAI_API_KEY` to your OpenAI API key from https://platform.openai.com/api-keys.
 
-Alternatively use Docker Secrets instead of environment variables (see below).
-
-### 3. Start
+### 2. Start
 
 ```bash
-docker compose build
-docker compose up -d
+docker compose up -d --build
 ```
 
 Control UI: `http://localhost:18789/`
+
+**This is for local / trusted-network use only.** The gateway token is transmitted unencrypted. Do not expose port 18789 to the internet without a TLS reverse proxy.
+
+## Production Setup (Docker Swarm)
+
+For production, use **Docker Secrets** and **encrypted overlay networks**.
+
+### 1. Create Secrets
+
+```bash
+ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
+pwgen 40 1 | docker secret create openclaw-gateway-token -
+docker secret create private-key openclaw-key
+docker secret create authorized-key openclaw-key.pub
+echo "sk-..." | docker secret create openai-api-key -
+rm openclaw-key openclaw-key.pub
+```
+
+### 2. Encrypted Network
+
+```bash
+docker network create --driver overlay --opt encrypted openclaw
+```
+
+This enables IPsec encryption for all traffic between swarm nodes.
+
+### 3. Deploy
+
+Use `docker stack deploy` with a production compose file that references secrets:
+
+```yaml
+secrets:
+  openclaw-gateway-token:
+    external: true
+  private-key:
+    external: true
+  authorized-key:
+    external: true
+  openai-api-key:
+    external: true
+```
+
+Entrypoints automatically read from `/run/secrets/` when environment variables are empty.
+
+### Production Checklist
+
+- [ ] All secrets via `docker secret`, not environment variables
+- [ ] Encrypted overlay network (`--opt encrypted`)
+- [ ] Port 18789 behind TLS reverse proxy (nginx, Traefik, Kong)
+- [ ] Port 18790 not exposed (internal bridge only)
+- [ ] Firewall restricts access to gateway port
+- [ ] Consider `read_only: true` + `tmpfs` mounts if OpenClaw supports it
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENCLAW_GATEWAY_TOKEN` | yes | Shared secret for Control UI (e.g. `pwgen 40 1`) |
+| `OPENCLAW_GATEWAY_TOKEN` | yes | Shared secret for Control UI |
 | `AUTHORIZED_KEY` | yes | SSH public key (ed25519) for sandbox access |
-| `OPENAI_API_KEY` | yes | OpenAI API key (e.g. `sk-...`) |
-| `PRIVATE_KEY` | yes | SSH private key for gateway → sandbox (\n-encoded) |
+| `OPENAI_API_KEY` | yes | OpenAI API key |
+| `PRIVATE_KEY` | yes | SSH private key, `\n`-encoded (gateway → sandbox) |
 | `OPENCLAW_CONFIG_DIR` | no | Host path for config (default: Docker volume) |
-| `OPENCLAW_WORKSPACE_DIR` | no | Host path for workspace (default: Docker volume) |
 | `OPENCLAW_GATEWAY_PORT` | no | Gateway port (default: 18789) |
-| `OPENCLAW_BRIDGE_PORT` | no | Bridge port (default: 18790) |
-| `OPENCLAW_GATEWAY_BIND` | no | Bind mode (default: lan) |
-
-## Docker Secrets (Alternative to Env)
-
-For `docker stack deploy` or increased security:
-
-```yaml
-secrets:
-  openclaw-gateway-token:
-    file: ./secrets/gateway-token
-  authorized-key:
-    file: ./secrets/authorized-key.pub
-  private-key:
-    file: ./secrets/private-key
-  openai-api-key:
-    file: ./secrets/openai-api-key
-```
-
-Entrypoints automatically read from `/run/secrets/` when the environment variable is empty.
 
 ## Architecture
 
-- **openclaw-gateway**: `alpine/openclaw:latest` — control plane, LLM, web UI (port 18789)
-- **openclaw-sandbox**: Custom image (`mwaeckerlin/ubuntu-base`) — SSH server for isolated tool execution
+```
+┌─────────────────────────────┐     SSH (key auth)     ┌──────────────────────┐
+│  openclaw-gateway           │ ──────────────────────▶ │  openclaw-sandbox    │
+│  alpine/openclaw:latest     │                         │  ubuntu-base + tools │
+│  port 18789 (UI + API)      │                         │  sshd :22            │
+│  USER node (1000)           │                         │  USER root (sshd)    │
+└─────────────────────────────┘                         │  login: somebody     │
+                                                        └──────────────────────┘
+```
