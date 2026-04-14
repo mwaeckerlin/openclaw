@@ -1,6 +1,6 @@
 services:
   openclaw-gateway:
-    image: mwaeckerlin/openclaw-gateway
+    image: mwaeckerlin/openclaw:gateway
     build:
       context: .
       dockerfile: Dockerfile.gateway
@@ -34,15 +34,16 @@ services:
       start_period: 20s
     restart: unless-stopped
     networks:
-      - openclaw
+      - gateway-sandbox
 
   openclaw-sandbox:
-    image: mwaeckerlin/openclaw-sandbox
+    image: mwaeckerlin/openclaw:sandbox
     build:
       context: .
       dockerfile: Dockerfile.sandbox
     environment:
       AUTHORIZED_KEY: ${AUTHORIZED_KEY:-}
+      DOCKER_HOST: tcp://openclaw-dind:2375
     volumes:
       - openclaw-workspace:/home/somebody
     security_opt:
@@ -54,9 +55,30 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    depends_on:
+      openclaw-dind:
+        condition: service_started
     restart: unless-stopped
     networks:
-      - openclaw
+      - gateway-sandbox
+      - sandbox-dind
+
+  openclaw-dind:
+    image: docker:dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - openclaw-docker:/var/lib/docker
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - sandbox-dind
 
   allow-write-access:
     image: mwaeckerlin/allow-write-access
@@ -66,8 +88,10 @@ services:
       - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/app
 
 networks:
-  openclaw:
+  gateway-sandbox:
+  sandbox-dind:
 
 volumes:
   openclaw-config:
   openclaw-workspace:
+  openclaw-docker:

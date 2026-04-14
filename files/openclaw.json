@@ -37,5 +37,16 @@
         }
       }
     }
+  },
+  "plugins": {
+    "enabled": true,
+    "entries": {
+      "voice-call": {
+        "enabled": true,
+        "config": {
+          "provider": "mock"
+        }
+      }
+    }
   }
 }
