@@ -19,8 +19,9 @@ services:
       - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
-      - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
     init: true
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test:
         - CMD
@@ -44,6 +45,9 @@ services:
       AUTHORIZED_KEY: ${AUTHORIZED_KEY:-}
     volumes:
       - openclaw-workspace:/home/somebody
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
     healthcheck:
       test: ["CMD", "pgrep", "-x", "sshd"]
       interval: 10s
@@ -56,8 +60,6 @@ services:
 
   allow-write-access:
     image: mwaeckerlin/allow-write-access
-    environment:
-      ALLOW_USER: "chown -R 1000:1000"
     volumes:
       - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/app
 

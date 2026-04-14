@@ -8,6 +8,17 @@
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
     }
   },
+  "tools": {
+    "fs": {
+      "workspaceOnly": true
+    },
+    "loopDetection": {
+      "enabled": true,
+      "warningThreshold": 3,
+      "criticalThreshold": 5,
+      "globalCircuitBreakerThreshold": 10
+    }
+  },
   "agents": {
     "defaults": {
       "model": {
