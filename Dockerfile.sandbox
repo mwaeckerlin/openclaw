@@ -38,7 +38,6 @@ ARG CONFIGURATION_COMMANDS=" \
   "
 FROM mwaeckerlin/ubuntu-base AS build
 ENV CONTAINERNAME    "openclaw"
-ENV DOCKER_HOST      "tcp://openclaw-dind:2375"
 ADD files/sandbox-entrypoint.sh /entrypoint.sh
 RUN install -d -m 700 -o ${RUN_USER} -g ${RUN_GROUP} ${RUN_HOME}/.ssh
 EXPOSE 22
