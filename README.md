@@ -39,8 +39,8 @@ For local testing with `docker compose` and `.env` file.
 ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
 cat > .env <<EOF
 OPENCLAW_GATEWAY_TOKEN=$(pwgen 40 1)
-AUTHORIZED_KEY=$(cat openclaw-key.pub)
-PRIVATE_KEY=$(sed -z 's/\n/\\n/g' openclaw-key)
+OPENCLAW_SANDBOX_SSH_PUBLIC_KEY=$(cat openclaw-key.pub)
+OPENCLAW_SANDBOX_SSH_PRIVATE_KEY=$(sed -z 's/\n/\\n/g' openclaw-key)
 OPENAI_API_KEY=sk-...
 EOF
 rm openclaw-key.pub
@@ -67,8 +67,8 @@ For production, use **Docker Secrets** and **encrypted overlay networks**.
 ```bash
 ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
 pwgen 40 1 | docker secret create openclaw-gateway-token -
-docker secret create private-key openclaw-key
-docker secret create authorized-key openclaw-key.pub
+docker secret create openclaw-sandbox-ssh-private-key openclaw-key
+docker secret create openclaw-sandbox-ssh-public-key openclaw-key.pub
 echo "sk-..." | docker secret create openai-api-key -
 rm openclaw-key openclaw-key.pub
 ```
@@ -89,15 +89,27 @@ Use `docker stack deploy` with a production compose file that references secrets
 secrets:
   openclaw-gateway-token:
     external: true
-  private-key:
+  openclaw-sandbox-ssh-private-key:
     external: true
-  authorized-key:
+  openclaw-sandbox-ssh-public-key:
     external: true
   openai-api-key:
     external: true
 ```
 
 Entrypoints automatically read from `/run/secrets/` when environment variables are empty.
+
+### Automatic Secret-to-Environment Mapping
+
+The gateway entrypoint iterates over all files in `/run/secrets/` and exports each as an environment variable. The filename is converted to uppercase with dashes replaced by underscores:
+
+| Secret file | Environment variable |
+|---|---|
+| `/run/secrets/openai-api-key` | `OPENAI_API_KEY` |
+| `/run/secrets/openclaw-sandbox-ssh-private-key` | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` |
+| `/run/secrets/openclaw-sandbox-ssh-public-key` | `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` |
+
+This means any Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables set via `environment:` in Compose.
 
 ### Production Checklist
 
@@ -113,11 +125,25 @@ Entrypoints automatically read from `/run/secrets/` when environment variables a
 | Variable | Required | Description |
 |---|---|---|
 | `OPENCLAW_GATEWAY_TOKEN` | yes | Shared secret for Control UI |
-| `AUTHORIZED_KEY` | yes | SSH public key (ed25519) for sandbox access |
+| `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` | yes | SSH public key (ed25519) for sandbox access |
 | `OPENAI_API_KEY` | yes | OpenAI API key |
-| `PRIVATE_KEY` | yes | SSH private key, `\n`-encoded (gateway → sandbox) |
+| `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` | yes | SSH private key, `\n`-encoded (gateway → sandbox) |
 | `OPENCLAW_CONFIG_DIR` | no | Host path for config (default: Docker volume) |
 | `OPENCLAW_GATEWAY_PORT` | no | Gateway port (default: 18789) |
+
+## Custom Configuration
+
+The default `openclaw.json` is baked into the gateway image. On first start, it is copied to `~/.openclaw/openclaw.json`. To use your own configuration, mount or copy a custom `openclaw.json` into the config volume:
+
+```bash
+# Copy into the running container
+docker cp my-openclaw.json openclaw-gateway-1:/home/node/.openclaw/openclaw.json
+
+# Or mount a host directory
+# OPENCLAW_CONFIG_DIR=/path/to/my/config docker compose up -d
+```
+
+The entrypoint only copies the default config if `~/.openclaw/openclaw.json` does not already exist. Your custom config is preserved across restarts.
 
 ## Docker-in-Docker (Optional)
 

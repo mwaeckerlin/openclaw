@@ -13,7 +13,7 @@ services:
       HOME: /home/node
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
-      PRIVATE_KEY: ${PRIVATE_KEY:-}
+      OPENCLAW_SANDBOX_SSH_PRIVATE_KEY: ${OPENCLAW_SANDBOX_SSH_PRIVATE_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
       - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
@@ -42,7 +42,7 @@ services:
       context: .
       dockerfile: Dockerfile.sandbox
     environment:
-      AUTHORIZED_KEY: ${AUTHORIZED_KEY:-}
+      OPENCLAW_SANDBOX_SSH_PUBLIC_KEY: ${OPENCLAW_SANDBOX_SSH_PUBLIC_KEY:-}
       DOCKER_HOST: tcp://openclaw-dind:2375
     volumes:
       - openclaw-workspace:/home/somebody
