@@ -33,7 +33,7 @@
           "target": "somebody@openclaw-sandbox:22",
           "workspaceRoot": "/home/somebody/workspaces",
           "strictHostKeyChecking": false,
-          "identityFile": "/home/node/.ssh/id_ed25519"
+          "identityFile": "/home/node/.ssh/ssh-id-gateway"
         }
       }
     }
