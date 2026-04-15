@@ -66,10 +66,10 @@ For production, use **Docker Secrets** and **encrypted overlay networks**.
 
 ```bash
 ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
-pwgen 40 1 | docker secret create openclaw-gateway-token -
-docker secret create openclaw-sandbox-ssh-private-key openclaw-key
-docker secret create openclaw-sandbox-ssh-public-key openclaw-key.pub
-echo "sk-..." | docker secret create openai-api-key -
+pwgen 40 1 | docker secret create openclaw_gateway_token -
+docker secret create openclaw_sandbox_ssh_private_key openclaw-key
+docker secret create openclaw_sandbox_ssh_public_key openclaw-key.pub
+echo "sk-..." | docker secret create openai_api_key -
 rm openclaw-key openclaw-key.pub
 ```
 
@@ -87,13 +87,13 @@ Use `docker stack deploy` with a production compose file that references secrets
 
 ```yaml
 secrets:
-  openclaw-gateway-token:
+  openclaw_gateway_token:
     external: true
-  openclaw-sandbox-ssh-private-key:
+  openclaw_sandbox_ssh_private_key:
     external: true
-  openclaw-sandbox-ssh-public-key:
+  openclaw_sandbox_ssh_public_key:
     external: true
-  openai-api-key:
+  openai_api_key:
     external: true
 ```
 
@@ -101,13 +101,14 @@ Entrypoints automatically read from `/run/secrets/` when environment variables a
 
 ### Automatic Secret-to-Environment Mapping
 
-The gateway entrypoint iterates over all files in `/run/secrets/` and exports each as an environment variable. The filename is converted to uppercase with dashes replaced by underscores:
+The gateway entrypoint iterates over all files in `/run/secrets/` and exports each as an environment variable. The filename is uppercased and dashes are replaced by underscores:
 
 | Secret file | Environment variable |
 |---|---|
-| `/run/secrets/openai-api-key` | `OPENAI_API_KEY` |
-| `/run/secrets/openclaw-sandbox-ssh-private-key` | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` |
-| `/run/secrets/openclaw-sandbox-ssh-public-key` | `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` |
+| `/run/secrets/openai_api_key` | `OPENAI_API_KEY` |
+| `/run/secrets/openclaw_sandbox_ssh_private_key` | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` |
+
+The sandbox reads its public key directly from `/run/secrets/openclaw_sandbox_ssh_public_key` (fallback when `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` is not set).
 
 This means any Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables set via `environment:` in Compose.
 
