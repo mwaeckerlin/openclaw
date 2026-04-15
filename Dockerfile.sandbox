@@ -15,8 +15,15 @@ ARG PACKAGES=" \
   golang \
   rustc cargo \
   graphviz plantuml pandoc \
-  ffmpeg imagemagick \
-  texlive-latex-base texlive-fonts-recommended \
+  ffmpeg imagemagick sox lame opus-tools \
+  gimp optipng jpegoptim webp potrace \
+  libimage-exiftool-perl mediainfo gnuplot \
+  inkscape librsvg2-bin \
+  libreoffice-core \
+  poppler-utils ghostscript qpdf \
+  texlive-latex-base texlive-fonts-recommended texlive-latex-extra texlive-xetex latexmk \
+  tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng \
+  chromium-browser \
   zip unzip xz-utils bzip2 \
   jq yq ripgrep fd-find bat fzf just htop \
   postgresql-client redis-tools default-mysql-client \
@@ -35,6 +42,7 @@ ARG CONFIGURATION_COMMANDS=" \
   /etc/ssh/sshd_config \
   && mkdir -p /run/sshd \
   && adduser \${RUN_USER} docker \
+  && install -m 700 -o \${RUN_USER} -g \${RUN_GROUP} /dev/null /etc/environment \
   "
 FROM mwaeckerlin/ubuntu-base AS build
 ENV CONTAINERNAME    "openclaw"
