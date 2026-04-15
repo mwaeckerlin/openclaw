@@ -129,6 +129,7 @@ This means any Docker Secret is automatically available as an environment variab
 | `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` | yes | SSH public key (ed25519) for sandbox access |
 | `OPENAI_API_KEY` | yes | OpenAI API key |
 | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` | yes | SSH private key, `\n`-encoded (gateway → sandbox) |
+| `OVERWRITE_CONFIG` | no | If set, overwrite `openclaw.json` with the baked-in default on every start |
 | `OPENCLAW_CONFIG_DIR` | no | Host path for config (default: Docker volume) |
 | `OPENCLAW_GATEWAY_PORT` | no | Gateway port (default: 18789) |
 
@@ -144,7 +145,7 @@ docker cp my-openclaw.json openclaw-gateway-1:/home/node/.openclaw/openclaw.json
 # OPENCLAW_CONFIG_DIR=/path/to/my/config docker compose up -d
 ```
 
-The entrypoint only copies the default config if `~/.openclaw/openclaw.json` does not already exist. Your custom config is preserved across restarts.
+By default, the config is only copied on first start and preserved across restarts. The included `docker-compose.yml` sets `OVERWRITE_CONFIG=true` so the baked-in default is always written — unset it to keep manual changes.
 
 ## Docker-in-Docker (Optional)
 
