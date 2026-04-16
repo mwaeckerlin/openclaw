@@ -155,6 +155,22 @@ The `openclaw-dind` service provides an isolated Docker daemon for the sandbox. 
 
 **Security warning:** The AI has full root access inside the DinD daemon. It can mount the DinD container's root filesystem, destroy all images/containers, or exhaust disk space on the `openclaw-docker` volume. DinD is isolated from the host Docker, but within its own daemon the AI has unrestricted access. Only enable this if you accept that risk.
 
+### DinD in Docker Swarm
+
+Docker Swarm does not support `privileged: true` in stack deploy files. The DinD service must be started manually as a standalone service:
+
+```bash
+docker service create \
+  --name openclaw-dind \
+  --privileged \
+  --network sandbox-dind \
+  --env DOCKER_TLS_CERTDIR="" \
+  --mount type=volume,source=openclaw-docker,target=/var/lib/docker \
+  docker:dind
+```
+
+Then deploy the rest of the stack without the `openclaw-dind` service. The sandbox connects via `DOCKER_HOST=tcp://openclaw-dind:2375` over the shared `sandbox-dind` network.
+
 ## Architecture
 
 ```plantuml
