@@ -1,4 +1,4 @@
-ARG PACKAGES="openssh-server"
+ARG PACKAGES="openssh-server docker.io docker-compose-v2"
 ARG PACKAGES_DEV=" \
   lsb-release bash coreutils findutils grep sed gawk diffutils patch file tree \
   git git-lfs gh \
@@ -31,8 +31,7 @@ ARG PACKAGES_UTILS=" \
   locales pwgen chromium-browser \
   "
 ARG PACKAGES_DB=" \
-  postgresql-client redis-tools default-mysql-client \
-  docker.io docker-compose-v2 sqlite3 \
+  postgresql-client redis-tools default-mysql-client sqlite3 \
   "
 ARG CONFIGURATION_COMMANDS=" \
   sed -i \
