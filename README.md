@@ -157,19 +157,7 @@ The `openclaw-dind` service provides an isolated Docker daemon for the sandbox. 
 
 ### DinD in Docker Swarm
 
-Docker Swarm does not support `privileged: true` in stack deploy files. The DinD service must be started manually as a standalone service:
-
-```bash
-docker service create \
-  --name openclaw-dind \
-  --privileged \
-  --network sandbox-dind \
-  --env DOCKER_TLS_CERTDIR="" \
-  --mount type=volume,source=openclaw-docker,target=/var/lib/docker \
-  docker:dind
-```
-
-Then deploy the rest of the stack without the `openclaw-dind` service. The sandbox connects via `DOCKER_HOST=tcp://openclaw-dind:2375` over the shared `sandbox-dind` network.
+Docker Swarm does not support `privileged: true` in stack deploy files. Haven't found a solution yet for Docker-in-Docker in Docker Swarm.
 
 ## Architecture
 
