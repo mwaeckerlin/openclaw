@@ -54,7 +54,25 @@ RUN $PKG_INSTALL ${PACKAGES_LATEX}
 RUN $PKG_INSTALL ${PACKAGES_UTILS}
 RUN $PKG_INSTALL ${PACKAGES_DB}
 RUN ${PKG_CLEANUP}
-RUN echo ${PACKAGES_DEV} ${PACKAGES_LANG} ${PACKAGES_MEDIA} ${PACKAGES_LATEX} ${PACKAGES_UTILS} ${PACKAGES_DB} > /etc/installed-ubuntu-packages
+RUN ( \
+  echo "# PACKAGES_DEV"; \
+  echo ${PACKAGES_DEV} | tr ' ' '\n'; \
+  echo; \
+  echo "# PACKAGES_LANG"; \
+  echo ${PACKAGES_LANG} | tr ' ' '\n'; \
+  echo; \
+  echo "# PACKAGES_MEDIA"; \
+  echo ${PACKAGES_MEDIA} | tr ' ' '\n'; \
+  echo; \
+  echo "# PACKAGES_LATEX"; \
+  echo ${PACKAGES_LATEX} | tr ' ' '\n'; \
+  echo; \
+  echo "# PACKAGES_UTILS"; \
+  echo ${PACKAGES_UTILS} | tr ' ' '\n'; \
+  echo; \
+  echo "# PACKAGES_DB"; \
+  echo ${PACKAGES_DB} | tr ' ' '\n' \
+  ) > /etc/installed-ubuntu-packages
 RUN install -d -m 700 -o ${RUN_USER} -g ${RUN_GROUP} ${RUN_HOME}/.ssh
 ADD files/sandbox-entrypoint.sh /entrypoint.sh
 EXPOSE 22
