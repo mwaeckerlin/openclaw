@@ -1,38 +1,4 @@
 ARG PACKAGES="openssh-server docker.io docker-compose-v2"
-ARG PACKAGES_DEV=" \
-  lsb-release bash coreutils findutils grep sed gawk diffutils patch file tree \
-  git git-lfs gh \
-  build-essential make cmake ninja-build \
-  autoconf automake autotools-dev libtool pkg-config \
-  gcc g++ gdb valgrind clang clang-format shellcheck \
-  "
-ARG PACKAGES_LANG=" \
-  python3 python3-pip python3-venv python3-dev black pylint \
-  php-cli php-mbstring php-xml php-curl php-zip composer \
-  nodejs npm ruby ruby-dev golang rustc cargo \
-  pipx python3-poetry \
-  "
-ARG PACKAGES_MEDIA=" \
-  graphviz plantuml pandoc \
-  ffmpeg imagemagick sox lame opus-tools \
-  gimp optipng jpegoptim webp potrace \
-  libimage-exiftool-perl mediainfo gnuplot \
-  inkscape librsvg2-bin libreoffice-core \
-  poppler-utils ghostscript qpdf \
-  tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng \
-  "
-ARG PACKAGES_LATEX=" \
-  texlive-latex-base texlive-fonts-recommended texlive-latex-extra texlive-xetex latexmk \
-  "
-ARG PACKAGES_UTILS=" \
-  curl wget nmap iputils-ping iproute2 netcat-openbsd dnsutils \
-  openssh-client rsync jq yq ripgrep fd-find bat fzf just htop \
-  zip unzip xz-utils bzip2 procps ca-certificates gnupg apt-transport-https \
-  locales pwgen chromium-browser \
-  "
-ARG PACKAGES_DB=" \
-  postgresql-client redis-tools default-mysql-client sqlite3 \
-  "
 ARG CONFIGURATION_COMMANDS=" \
   sed -i \
   -e 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' \
@@ -46,6 +12,40 @@ ARG CONFIGURATION_COMMANDS=" \
   "
 FROM mwaeckerlin/ubuntu-base AS build
 ENV CONTAINERNAME    "openclaw"
+ENV PACKAGES_DEV=" \
+  lsb-release bash coreutils findutils grep sed gawk diffutils patch file tree \
+  git git-lfs gh \
+  build-essential make cmake ninja-build \
+  autoconf automake autotools-dev libtool pkg-config \
+  gcc g++ gdb valgrind clang clang-format shellcheck \
+  "
+ENV PACKAGES_LANG=" \
+  python3 python3-pip python3-venv python3-dev black pylint \
+  php-cli php-mbstring php-xml php-curl php-zip composer \
+  nodejs npm ruby ruby-dev golang rustc cargo \
+  pipx python3-poetry \
+  "
+ENV PACKAGES_MEDIA=" \
+  graphviz plantuml pandoc \
+  ffmpeg imagemagick sox lame opus-tools \
+  gimp optipng jpegoptim webp potrace \
+  libimage-exiftool-perl mediainfo gnuplot \
+  inkscape librsvg2-bin libreoffice-core \
+  poppler-utils ghostscript qpdf \
+  tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng \
+  "
+ENV PACKAGES_LATEX=" \
+  texlive-latex-base texlive-fonts-recommended texlive-latex-extra texlive-xetex latexmk \
+  "
+ENV PACKAGES_UTILS=" \
+  curl wget nmap iputils-ping iproute2 netcat-openbsd dnsutils \
+  openssh-client rsync jq yq ripgrep fd-find bat fzf just htop \
+  zip unzip xz-utils bzip2 procps ca-certificates gnupg apt-transport-https \
+  locales pwgen chromium-browser \
+  "
+ENV PACKAGES_DB=" \
+  postgresql-client redis-tools default-mysql-client sqlite3 \
+  "
 USER root
 RUN $PKG_INSTALL ${PACKAGES_DEV}
 RUN $PKG_INSTALL ${PACKAGES_LANG}
@@ -54,12 +54,10 @@ RUN $PKG_INSTALL ${PACKAGES_LATEX}
 RUN $PKG_INSTALL ${PACKAGES_UTILS}
 RUN $PKG_INSTALL ${PACKAGES_DB}
 RUN ${PKG_CLEANUP}
-USER ${RUN_USER}
-RUN echo ${PACKAGES_DEV} ${PACKAGES_LANG} ${PACKAGES_MEDIA} ${PACKAGES_LATEX} ${PACKAGES_UTILS} ${PACKAGES_DB} > ${RUN_HOME}/.installed-packages
-RUN mkdir ${RUN_HOME}/.ssh
+RUN echo ${PACKAGES_DEV} ${PACKAGES_LANG} ${PACKAGES_MEDIA} ${PACKAGES_LATEX} ${PACKAGES_UTILS} ${PACKAGES_DB} > /etc/installed-ubuntu-packages
+RUN install -d -m 700 -o ${RUN_USER} -g ${RUN_GROUP} ${RUN_HOME}/.ssh
 ADD files/sandbox-entrypoint.sh /entrypoint.sh
 EXPOSE 22
 ENTRYPOINT ["/entrypoint.sh"]
 
 FROM build
-USER root
