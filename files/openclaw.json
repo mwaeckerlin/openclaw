@@ -27,7 +27,7 @@
       "sandbox": {
         "mode": "all",
         "backend": "ssh",
-        "scope": "session",
+        "scope": "agent",
         "workspaceAccess": "rw",
         "ssh": {
           "target": "somebody@openclaw-sandbox:22",
