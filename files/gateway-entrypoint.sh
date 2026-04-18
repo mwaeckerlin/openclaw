@@ -45,5 +45,11 @@ if [ -n "$LITELLM_URL" ] && [ -n "$LITELLM_MASTER_KEY" ]; then
   echo "Models injected into config"
 fi
 
+if [ -n "$PLUGINS" ]; then
+  echo "==== Install Plugins ===="
+  echo "Plugins to install: $PLUGINS"
+    openclaw plugins install "$PLUGINS"
+fi
+
 echo "==== Starting OpenClaw Gateway ===="
 exec "$@"
