@@ -36,6 +36,7 @@ services:
     restart: unless-stopped
     networks:
       - gateway-sandbox
+      - gateway-mcp
 
   openclaw-sandbox:
     image: mwaeckerlin/openclaw:sandbox
@@ -63,6 +64,7 @@ services:
     networks:
       - gateway-sandbox
       - sandbox-dind
+      - sandbox-mcp
 
   openclaw-dind:
     image: docker:dind
@@ -88,9 +90,33 @@ services:
     volumes:
       - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/app
 
+  openclaw-mcp-gateway:
+    build:
+      context: ../openclaw-mcp-gateway
+      dockerfile: Dockerfile
+    image: mwaeckerlin/openclaw-mcp-gateway
+    depends_on:
+      openclaw-gateway:
+        condition: service_healthy
+    environment:
+      OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_MCP_PORT: ${OPENCLAW_MCP_PORT:-4000}
+      OPENCLAW_MCP_HOST: ${OPENCLAW_MCP_HOST:-0.0.0.0}
+    ports:
+      - "${OPENCLAW_MCP_PORT:-4000}:${OPENCLAW_MCP_PORT:-4000}"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - gateway-mcp
+      - sandbox-mcp
+
 networks:
   gateway-sandbox:
   sandbox-dind:
+  gateway-mcp:
+  sandbox-mcp:
 
 volumes:
   openclaw-config:

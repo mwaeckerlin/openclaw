@@ -50,8 +50,14 @@ Set `OPENAI_API_KEY` to your OpenAI API key from https://platform.openai.com/api
 
 ### 2. Start
 
+**In foreground (see logs in real-time):**
 ```bash
-docker compose up -d --build
+npm start
+```
+
+**In background (daemon mode):**
+```bash
+npm run start:daemon
 ```
 
 Control UI: `http://localhost:18789/`
