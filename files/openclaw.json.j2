@@ -1,0 +1,279 @@
+{
+{% if LITELLM_MASTER_KEY | default('') | length > 0 %}
+  "auth": {
+    "profiles": {
+      "litellm:default": {
+        "provider": "litellm",
+        "mode": "api_key"
+      }
+    }
+  },
+{% endif %}
+  "models": {
+    "mode": "merge",
+    "providers": {
+{% if LITELLM_MASTER_KEY | default('') | length > 0 %}
+      "litellm": {
+        "baseUrl": "{{ LITELLM_BASE_URL | default('http://litellm:4000') }}",
+        "api": "openai-completions",
+        "apiKey": "${LITELLM_MASTER_KEY}",
+        "models": []
+      },
+{% endif %}
+{% if OPENAI_API_KEY | default('') | length > 0 %}
+      "openai": {
+        "baseUrl": "https://api.openai.com/v1",
+        "apiKey": "${OPENAI_API_KEY}",
+        "models": []
+      },
+{% endif %}
+      "_end": true
+    }
+  },
+  "agents": {
+    "defaults": {
+      "sandbox": {
+        "mode": "all",
+        "backend": "ssh",
+        "scope": "agent",
+        "workspaceAccess": "rw",
+        "ssh": {
+          "target": "somebody@openclaw-sandbox:22",
+          "workspaceRoot": "/home/somebody/workspaces",
+          "strictHostKeyChecking": false,
+          "identityFile": "/home/node/.ssh/ssh-id-gateway"
+        }
+      },
+      "model": {
+        "primary": "{{ OPENCLAW_PRIMARY_MODEL | default('__AUTO_MODEL__') }}"
+      },
+      "models": {
+{% if LITELLM_MASTER_KEY | default('') | length > 0 %}
+        "litellm/openrouter/anthropic/claude-opus-4": {
+          "alias": "Opus 4"
+        },
+        "litellm/openrouter/anthropic/claude-sonnet-4": {
+          "alias": "Sonnet 4"
+        },
+        "litellm/openrouter/anthropic/claude-3.5-haiku": {
+          "alias": "Haiku 3.5"
+        },
+        "litellm/openrouter/openai/gpt-4o": {
+          "alias": "GPT-4o"
+        },
+        "litellm/openrouter/google/gemini-2.5-pro-preview": {
+          "alias": "Gemini Pro"
+        },
+        "litellm/openrouter/deepseek/deepseek-r1": {
+          "alias": "DeepSeek R1"
+        },
+        "litellm/openrouter/mistralai/codestral-2501": {
+          "alias": "Codestral"
+        },
+{% endif %}
+        "_end": true
+      },
+      "heartbeat": {
+        "every": "{{ OPENCLAW_HEARTBEAT_INTERVAL | default('0') }}"
+      },
+      "timeoutSeconds": {{ OPENCLAW_TIMEOUT_SECONDS | default('300') }},
+      "maxConcurrent": {{ OPENCLAW_MAX_CONCURRENT | default('1') }},
+      "subagents": {
+        "maxConcurrent": 1,
+        "runTimeoutSeconds": 120
+      }
+    }
+  },
+  "tools": {
+    "fs": {
+      "workspaceOnly": true
+    },
+    "loopDetection": {
+      "enabled": true,
+      "warningThreshold": 3,
+      "criticalThreshold": 5,
+      "globalCircuitBreakerThreshold": 10
+    },
+{% if OPENAI_API_KEY | default('') | length > 0 %}
+    "media": {
+      "audio": {
+        "enabled": true,
+        "echoTranscript": true,
+        "models": [
+          {
+            "provider": "openai",
+            "model": "whisper-1"
+          }
+        ]
+      }
+    },
+{% else %}
+    "media": {
+      "audio": {
+        "enabled": false
+      }
+    },
+{% endif %}
+    "_end": true
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "command-logger": {
+          "enabled": true
+        },
+        "session-memory": {
+          "enabled": true
+        },
+        "bootstrap-extra-files": {
+          "enabled": true
+        },
+        "boot-md": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "skills": {
+    "install": {
+      "nodeManager": "npm"
+    },
+    "entries": {
+{% if OPENCLAW_NOTION_API_KEY | default('') | length > 0 %}
+      "notion": {
+        "apiKey": "${OPENCLAW_NOTION_API_KEY}"
+      },
+{% endif %}
+{% if OPENAI_API_KEY | default('') | length > 0 %}
+      "openai-whisper-api": {
+        "apiKey": "${OPENAI_API_KEY}"
+      },
+{% endif %}
+{% if OPENCLAW_TRELLO_API_KEY | default('') | length > 0 %}
+      "trello": {
+        "apiKey": "${OPENCLAW_TRELLO_API_KEY}"
+      },
+{% endif %}
+{% if OPENCLAW_ELEVENLABS_API_KEY | default('') | length > 0 %}
+      "elevenlabs": {
+        "apiKey": "${OPENCLAW_ELEVENLABS_API_KEY}"
+      },
+{% endif %}
+{% if OPENCLAW_GITHUB_TOKEN | default('') | length > 0 %}
+      "github": {
+        "token": "${OPENCLAW_GITHUB_TOKEN}"
+      },
+{% endif %}
+      "_end": true
+    }
+  },
+  "plugins": {
+    "entries": {
+{% if OPENCLAW_BRAVE_API_KEY | default('') | length > 0 %}
+      "brave": {
+        "enabled": true,
+        "apiKey": "${OPENCLAW_BRAVE_API_KEY}"
+      },
+{% else %}
+      "duckduckgo": {
+        "enabled": true
+      },
+{% endif %}
+      "_end": true
+    }
+  },
+{% if OPENCLAW_TELEGRAM_BOT_TOKEN | default('') | length > 0 %}
+  "channels_telegram": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "open",
+      "allowFrom": ["*"],
+      "botToken": "${OPENCLAW_TELEGRAM_BOT_TOKEN}",
+      "groups": {
+        "*": {
+          "requireMention": false
+        }
+      },
+      "groupPolicy": "allowlist",
+      "streaming": {"mode": "partial"}
+    }
+  },
+{% endif %}
+{% if OPENCLAW_DISCORD_BOT_TOKEN | default('') | length > 0 %}
+  "channels_discord": {
+    "discord": {
+      "enabled": true,
+      "botToken": "${OPENCLAW_DISCORD_BOT_TOKEN}",
+      "streaming": {"mode": "partial"}
+    }
+  },
+{% endif %}
+{% if OPENCLAW_SLACK_BOT_TOKEN | default('') | length > 0 %}
+  "channels_slack": {
+    "slack": {
+      "enabled": true,
+      "botToken": "${OPENCLAW_SLACK_BOT_TOKEN}",
+      "streaming": {"mode": "partial"}
+    }
+  },
+{% endif %}
+  "messages": {
+    "tts": {
+      "auto": "tagged",
+{% if OPENCLAW_ELEVENLABS_API_KEY | default('') | length > 0 %}
+      "provider": "elevenlabs",
+{% else %}
+      "provider": "microsoft",
+      "modelOverrides": {
+        "enabled": true
+      },
+{% endif %}
+      "_end": true
+    },
+    "queue": {
+      "debounceMs": 1000,
+      "cap": 20
+    }
+  },
+  "logging": {
+    "level": "debug"
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "lan",
+    "port": 18789,
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "controlUi": {
+      "enabled": true,
+      "basePath": "{{ OPENCLAW_BASE_PATH | default('') }}",
+      "dangerouslyAllowHostHeaderOriginFallback": true,
+      "allowInsecureAuth": true,
+      "dangerouslyDisableDeviceAuth": true,
+      "allowedOrigins": [
+        "http://swarm-01",
+        "http://swarm-01.home.arpa"
+      ]
+    },
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    },
+    "trustedProxies": [
+      "10.0.0.0/8",
+      "172.16.0.0/12"
+    ]
+  }
+}

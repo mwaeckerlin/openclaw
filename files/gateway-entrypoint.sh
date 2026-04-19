@@ -20,9 +20,13 @@ if [ -z "$OPENCLAW_SANDBOX_SSH_PRIVATE_KEY" ]; then
 fi
 printf '%b' "${OPENCLAW_SANDBOX_SSH_PRIVATE_KEY}" > ~/.ssh/ssh-id-gateway
 chmod 600 ~/.ssh/ssh-id-gateway
+
+echo "==== Rendering Jinja2 Configuration ===="
+node /render-config.js /openclaw.json.j2.default ~/.openclaw/openclaw.json.rendered
+
 echo "==== Configuring OpenClaw ===="
 if [ -n "$OVERWRITE_CONFIG" ] || [ ! -e ~/.openclaw/openclaw.json ]; then
-  cp /openclaw.json.default ~/.openclaw/openclaw.json
+  cp ~/.openclaw/openclaw.json.rendered ~/.openclaw/openclaw.json
 fi
 
 if [ -n "$LITELLM_URL" ] && [ -n "$LITELLM_MASTER_KEY" ]; then
