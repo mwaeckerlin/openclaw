@@ -129,15 +129,103 @@ This means any Docker Secret is automatically available as an environment variab
 
 ## Environment Variables
 
+### Core Configuration
+
 | Variable | Required | Description |
 |---|---|---|
 | `OPENCLAW_GATEWAY_TOKEN` | yes | Shared secret for Control UI |
 | `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` | yes | SSH public key (ed25519) for sandbox access |
-| `OPENAI_API_KEY` | yes | OpenAI API key |
 | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` | yes | SSH private key, `\n`-encoded (gateway → sandbox) |
+| `OPENAI_API_KEY` | no | OpenAI API key; enables OpenAI provider, Whisper audio transcription, and is used as default model provider if `LITELLM_MASTER_KEY` is not set |
 | `OVERWRITE_CONFIG` | no | If set, overwrite `openclaw.json` with the baked-in default on every start |
 | `OPENCLAW_CONFIG_DIR` | no | Host path for config (default: Docker volume) |
 | `OPENCLAW_GATEWAY_PORT` | no | Gateway port (default: 18789) |
+
+### Optional Feature Enablement (via API Keys)
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENCLAW_ELEVENLABS_API_KEY` | — | ElevenLabs API key; enables TTS via ElevenLabs (else Microsoft TTS) |
+| `OPENCLAW_NOTION_API_KEY` | — | Notion API key; enables Notion skill |
+| `OPENCLAW_GITHUB_TOKEN` | — | GitHub personal access token; enables GitHub skill |
+| `OPENCLAW_TRELLO_API_KEY` | — | Trello API key; enables Trello skill |
+| `OPENCLAW_TELEGRAM_BOT_TOKEN` | — | Telegram bot token; enables Telegram channel |
+| `OPENCLAW_DISCORD_BOT_TOKEN` | — | Discord bot token; enables Discord channel |
+| `OPENCLAW_SLACK_BOT_TOKEN` | — | Slack bot token; enables Slack channel |
+| `OPENCLAW_BRAVE_API_KEY` | — | Brave Search API key; enables Brave plugin (else DuckDuckGo) |
+
+### LiteLLM Configuration (Optional)
+
+When `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the default model switches to `litellm/openrouter/anthropic/claude-sonnet-4`. Without it, OpenAI is used directly with `openai/gpt-4o` as default.
+
+| Variable | Default | Description |
+|---|---|---|
+| `LITELLM_MASTER_KEY` | — | Bearer token for LiteLLM API authentication; enables LiteLLM provider |
+| `LITELLM_URL` | — | Base URL of LiteLLM proxy for model discovery |
+| `LITELLM_BASE_URL` | `http://litellm:4000` | Base URL for connecting to LiteLLM |
+
+### Agent & Model Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENCLAW_PRIMARY_MODEL` | _(auto)_ | Default LLM model; auto-selects `litellm/openrouter/anthropic/claude-sonnet-4` if LiteLLM is configured, else `openai/gpt-4o` |
+| `OPENCLAW_HEARTBEAT_INTERVAL` | `0` | Cron expression for agent heartbeat (empty = disabled) |
+| `OPENCLAW_TIMEOUT_SECONDS` | `300` | Agent execution timeout in seconds |
+| `OPENCLAW_MAX_CONCURRENT` | `1` | Maximum concurrent agents |
+| `OPENCLAW_CRON_ENABLED` | `true` | Enable cron scheduler support |
+| `OPENCLAW_BASE_PATH` | _(empty)_ | Base path for Control UI (e.g. `/openclaw` behind reverse proxy) |
+
+### Configuration Features
+
+The OpenClaw configuration is now **Jinja2-templated**, allowing dynamic feature enablement based on environment variables. Features are **only included in the generated config if their corresponding API keys are provided**.
+
+**Examples:**
+
+**Minimal setup** (only required vars):
+```bash
+npm start  # Config has only gateway + sandbox + basic tools
+```
+
+**With Telegram channel** (add to .env):
+```bash
+OPENCLAW_TELEGRAM_BOT_TOKEN=123:ABC...
+npm start  # Telegram channel included in config
+```
+
+**With all skills and channels** (add to .env):
+```bash
+OPENCLAW_NOTION_API_KEY=...
+OPENCLAW_GITHUB_TOKEN=...
+OPENCLAW_TELEGRAM_BOT_TOKEN=...
+OPENCLAW_DISCORD_BOT_TOKEN=...
+OPENCLAW_ELEVENLABS_API_KEY=...  # enables TTS
+npm start  # All features enabled
+```
+
+**Production with Docker Secrets** (in compose file):
+```yaml
+services:
+  openclaw-gateway:
+    environment:
+      # Pass empty - mapped from secrets automatically
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_WHISPER_API_KEY: ${OPENCLAW_WHISPER_API_KEY:-}
+      # ... other feature keys
+```
+
+Then provide secrets via docker secret or mounted `/run/secrets/*` files.
+
+#### Conditional Features
+
+- **LiteLLM**: Enabled if `LITELLM_MASTER_KEY` set; adds LiteLLM provider, auth profile, and model aliases
+- **OpenAI**: Enabled if `OPENAI_API_KEY` set; adds OpenAI provider
+- **Default Model**: `litellm/openrouter/anthropic/claude-sonnet-4` with LiteLLM, `openai/gpt-4o` without; override with `OPENCLAW_PRIMARY_MODEL`
+- **Audio (Whisper)**: Enabled if `OPENAI_API_KEY` set
+- **TTS Provider**: ElevenLabs if `OPENCLAW_ELEVENLABS_API_KEY` set, else Microsoft
+- **Search Plugin**: Brave if `OPENCLAW_BRAVE_API_KEY` set, else DuckDuckGo (always present)
+- **Cron Scheduler**: Enabled by default (`OPENCLAW_CRON_ENABLED=true`); set to `false` to disable
+- **Channels**: Telegram, Discord, Slack — only included if bot tokens provided
+- **Skills**: Notion, GitHub, Trello, ElevenLabs, OpenAI Whisper — only included if API keys provided
 
 ## Custom Configuration
 
@@ -152,6 +240,18 @@ docker cp my-openclaw.json openclaw-gateway-1:/home/node/.openclaw/openclaw.json
 ```
 
 By default, the config is only copied on first start and preserved across restarts. The included `docker-compose.yml` sets `OVERWRITE_CONFIG=true` so the baked-in default is always written — unset it to keep manual changes.
+
+## OpenClaw MCP Gateway (Optional)
+
+The `openclaw-mcp-gateway` service ([mwaeckerlin/openclaw-mcp-gateway](https://github.com/mwaeckerlin/openclaw-mcp-gateway)) provides a secure MCP interface for the sandboxed AI agent to execute `openclaw` CLI commands in the server. It is **optional** — remove the `openclaw-mcp-gateway` service from `docker-compose.yml` to disable it.
+
+**Who needs this?** Users who want the AI agent to manage cron jobs, check gateway status, list sessions and myn other functions from within the sandbox. Without the MCP gateway, the agent has no way to interact with the OpenClaw gateway (by design — the sandbox has no gateway token).
+
+**What it does:** The MCP gateway holds the gateway token and exposes a fixed allowlist of operations (status checks, cron management) as MCP tools. The sandbox agent connects to the MCP gateway — never directly to the OpenClaw gateway. This keeps the gateway token out of the sandbox.
+
+**Network isolation:** Always seggregate your networks. This is especieally important here, so that the agent in the SSH sandbox cannot sniff th etoken.
+
+**Configuration:** `OPENCLAW_GATEWAY_TOKEN` must be set (same token as the main gateway). In production, use Docker secrets. `OPENCLAW_GATEWAY_URL` defaults to `http://openclaw-gateway:18789`. Override if your setup differs. The MCP gateway ships a skill file (`SKILL.md` in the [openclaw-mcp-gateway](https://github.com/mwaeckerlin/openclaw-mcp-gateway) repository) that teaches the agent how to use the MCP tools. Upload or paste the file into a chat with your agent and instruct it to install this skill as a local OpenClaw skill in `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
 
 ## Docker-in-Docker (Optional)
 
@@ -173,13 +273,17 @@ skinparam componentStyle rectangle
 
 actor User as user
 
-node "openclaw:gateway" as gw {
+node "mwaeckerlin/openclaw:gateway" as gw {
   [Control Plane\nLLM Proxy\nWeb UI] as ctrl
   storage "openclaw-config" as cfg
   ctrl - cfg
 }
 
-node "openclaw:sandbox" as sb {
+node "mwaeckerlin/openclaw-mcp-gatewy" {
+  [MCP OpenClaw Server] as mcp
+}
+
+node "mwaeckerlin/openclaw:sandbox" as sb {
   [sshd :22\nlogin: somebody] as sshd
   storage "openclaw-workspace" as ws
   sshd -left- ws
@@ -195,6 +299,8 @@ component "allow-write-access" as aw
 
 user --> ctrl : "HTTP :18789"
 ctrl --> sshd : "SSH (key auth)"
+sshd --up--> mcp : openclaw cli commands
+mcp --up--> ctrl : forward cli command
 sshd -right-> dd : "DOCKER_HOST\ntcp://openclaw-dind:2375"
 aw .left.> cfg : "chown"
 @enduml
