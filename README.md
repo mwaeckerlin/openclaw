@@ -146,6 +146,7 @@ This means any Docker Secret is automatically available as an environment variab
 |---|---|---|
 | `OPENCLAW_ELEVENLABS_API_KEY` | — | ElevenLabs API key; enables TTS via ElevenLabs (else Microsoft TTS) |
 | `OPENCLAW_NOTION_API_KEY` | — | Notion API key; enables Notion skill |
+| `OPENCLAW_GITHUB_TOKEN` | — | GitHub personal access token; enables GitHub MCP server via ACPX (token stays gateway-side, sandbox only sees MCP tools) |
 | `OPENCLAW_TRELLO_API_KEY` | — | Trello API key; enables Trello skill |
 | `OPENCLAW_TELEGRAM_BOT_TOKEN` | — | Telegram bot token; enables Telegram channel |
 | `OPENCLAW_DISCORD_BOT_TOKEN` | — | Discord bot token; enables Discord channel |
