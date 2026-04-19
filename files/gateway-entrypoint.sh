@@ -29,6 +29,14 @@ if [ -n "$OVERWRITE_CONFIG" ] || [ ! -e ~/.openclaw/openclaw.json ]; then
   cp ~/.openclaw/openclaw.json.rendered ~/.openclaw/openclaw.json
 fi
 
+if [ -n "$OPENCLAW_DEVICE_PAIRING" ]; then
+  echo "==== Pre-Seeding Device Pairing ===="
+  _state_dir="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+  mkdir -p "$_state_dir/devices"
+  printf '%s' "$OPENCLAW_DEVICE_PAIRING" > "$_state_dir/devices/paired.json"
+  echo "Device pairing written to $_state_dir/devices/paired.json"
+fi
+
 if [ -n "$LITELLM_URL" ] && [ -n "$LITELLM_MASTER_KEY" ]; then
   echo "==== Discovering LiteLLM Models ===="
   models_json=$(curl -sf -H "Authorization: Bearer $LITELLM_MASTER_KEY" "$LITELLM_URL/v1/models" 2>/dev/null)

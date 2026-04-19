@@ -36,6 +36,7 @@ services:
       OPENCLAW_MAX_CONCURRENT: ${OPENCLAW_MAX_CONCURRENT:-1}
       OPENCLAW_CRON_ENABLED: ${OPENCLAW_CRON_ENABLED:-true}
       OPENCLAW_BASE_PATH: ${OPENCLAW_BASE_PATH:-}
+      OPENCLAW_DEVICE_PAIRING: ${OPENCLAW_DEVICE_PAIRING:-}
     volumes:
       - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
     ports:

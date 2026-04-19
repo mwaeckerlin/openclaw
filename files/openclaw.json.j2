@@ -169,11 +169,6 @@
         "apiKey": "${OPENCLAW_ELEVENLABS_API_KEY}"
       },
 {% endif %}
-{% if OPENCLAW_GITHUB_TOKEN | default('') | length > 0 %}
-      "github": {
-        "token": "${OPENCLAW_GITHUB_TOKEN}"
-      },
-{% endif %}
       "_end": true
     }
   },

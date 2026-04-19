@@ -1,11 +1,10 @@
 # OpenClaw — Gateway + SSH Sandbox
 
-Run OpenClaw in a secure environment. OpenClaw runs sandboxed in Docker containers:
+Combine OpenClaw with Security and Easiness! Run out of the box a secure docker based sandboxed OpenClaw, locally or in a cloud.
 
-- **gateway**: Control plane, LLM proxy, web UI (port 18789)
-- **sandbox**: Ubuntu instance where the AI executes commands as unprivileged user `somebody`
+**It has never been so easy to run a secure sandboxed pre-configured OpenClaw!** — Just write some configuration variables in `.env`, run `npm start` and get your instance at: `http://localhost:18789/`
 
-The gateway accesses the sandbox via SSH key authentication.
+For a simple `.env` setup, see [Development Setup](#development-setup) below.
 
 ## Security Model
 
@@ -147,7 +146,6 @@ This means any Docker Secret is automatically available as an environment variab
 |---|---|---|
 | `OPENCLAW_ELEVENLABS_API_KEY` | — | ElevenLabs API key; enables TTS via ElevenLabs (else Microsoft TTS) |
 | `OPENCLAW_NOTION_API_KEY` | — | Notion API key; enables Notion skill |
-| `OPENCLAW_GITHUB_TOKEN` | — | GitHub personal access token; enables GitHub skill |
 | `OPENCLAW_TRELLO_API_KEY` | — | Trello API key; enables Trello skill |
 | `OPENCLAW_TELEGRAM_BOT_TOKEN` | — | Telegram bot token; enables Telegram channel |
 | `OPENCLAW_DISCORD_BOT_TOKEN` | — | Discord bot token; enables Discord channel |
@@ -252,6 +250,34 @@ The `openclaw-mcp-gateway` service ([mwaeckerlin/openclaw-mcp-gateway](https://g
 **Network isolation:** Always seggregate your networks. This is especieally important here, so that the agent in the SSH sandbox cannot sniff th etoken.
 
 **Configuration:** `OPENCLAW_GATEWAY_TOKEN` must be set (same token as the main gateway). In production, use Docker secrets. `OPENCLAW_GATEWAY_URL` defaults to `http://openclaw-gateway:18789`. Override if your setup differs. The MCP gateway ships a skill file (`SKILL.md` in the [openclaw-mcp-gateway](https://github.com/mwaeckerlin/openclaw-mcp-gateway) repository) that teaches the agent how to use the MCP tools. Upload or paste the file into a chat with your agent and instruct it to install this skill as a local OpenClaw skill in `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
+
+## Device Pre-Seeding (Optional)
+
+Pre-seed one or more paired devices at gateway startup, so they are recognized on first connect without interactive approval. This is useful for headless setups, CI/CD pipelines, or automated deployments.
+
+**Who needs this?** Admins who deploy OpenClaw without interactive access to the Control UI, e.g. in Docker Swarm, Kubernetes, or Ansible-managed environments.
+
+Set `OPENCLAW_DEVICE_PAIRING` (env var) or provide the Docker secret `openclaw_device_pairing`. The value is a JSON string that is written **verbatim** to `$OPENCLAW_STATE_DIR/devices/paired.json` (default: `~/.openclaw/devices/paired.json`). The content is the **authoritative** pairing state — it replaces any existing `paired.json` on every startup.
+
+**No transformation is applied.** The JSON must match OpenClaw's internal pairing structure exactly, as defined in `src/infra/device-pairing.ts`. The admin is responsible for providing the correct and complete structure. Refer to the OpenClaw source files for the current expected fields:
+
+- `src/infra/device-pairing.ts` — pairing entry structure
+- `src/infra/pairing-files.ts` — file paths and format
+- `src/config/paths.ts` — `OPENCLAW_STATE_DIR` resolution
+
+**Example** (in `.env`):
+
+```bash
+OPENCLAW_DEVICE_PAIRING='{"my-device":{"deviceId":"my-device","publicKey":"...","role":"operator","roles":["operator"],"scopes":["operator.admin"],"approvedScopes":["operator.admin"],"tokens":{"operator":{"token":"...","role":"operator","scopes":["operator.admin"],"createdAtMs":1713520000000}},"createdAtMs":1713520000000,"approvedAtMs":1713520000000}}'
+```
+
+**With Docker secrets:**
+
+```bash
+docker secret create openclaw_device_pairing pairing.json
+```
+
+The secret is auto-mapped to `OPENCLAW_DEVICE_PAIRING` by the gateway entrypoint.
 
 ## Docker-in-Docker (Optional)
 
