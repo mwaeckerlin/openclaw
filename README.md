@@ -224,7 +224,8 @@ Then provide secrets via docker secret or mounted `/run/secrets/*` files.
 - **Search Plugin**: Brave if `OPENCLAW_BRAVE_API_KEY` set, else DuckDuckGo (always present)
 - **Cron Scheduler**: Enabled by default (`OPENCLAW_CRON_ENABLED=true`); set to `false` to disable
 - **Channels**: Telegram, Discord, Slack — only included if bot tokens provided
-- **Skills**: Notion, GitHub, Trello, ElevenLabs, OpenAI Whisper — only included if API keys provided
+- **GitHub**: Enabled if `OPENCLAW_GITHUB_TOKEN` set; configures `@modelcontextprotocol/server-github` as ACPX MCP server (token stays gateway-side, sandbox only sees MCP tools)
+- **Skills**: Notion, Trello, ElevenLabs, OpenAI Whisper — only included if API keys provided
 
 ## Custom Configuration
 
