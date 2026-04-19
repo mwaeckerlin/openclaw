@@ -11,6 +11,10 @@ if [ -n "${DOCKER_HOST}" ]; then
   echo "==== Enabling Docker Host ===="
   echo "DOCKER_HOST=${DOCKER_HOST}" >> /etc/environment
 fi
+if [ -n "${OPENCLAW_MCP_GATEWAY_URL}" ]; then
+  echo "==== Setting MCP Gateway URL ===="
+  echo "OPENCLAW_MCP_GATEWAY_URL=${OPENCLAW_MCP_GATEWAY_URL}" >> /etc/environment
+fi
 chown -R ${RUN_USER}:${RUN_GROUP} ${RUN_HOME}
 chmod 700 ${RUN_HOME}/.ssh
 chmod 600 ${RUN_HOME}/.ssh/authorized_keys
