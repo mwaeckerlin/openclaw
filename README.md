@@ -47,7 +47,19 @@ rm openclaw-key.pub
 
 Set `OPENAI_API_KEY` to your OpenAI API key from https://platform.openai.com/api-keys.
 
-### 2. Start
+### 2. Generate MCP Gateway Device Pairing
+
+If you use the MCP gateway (enabled by default), generate a device keypair for secure gateway-to-MCP communication:
+
+```bash
+node generate-device-pairing.mjs
+```
+
+This appends `OPENCLAW_DEVICE_IDENTITY` and `OPENCLAW_DEVICE_PAIRING` to `.env`. The MCP gateway uses the private key to authenticate, and the OpenClaw gateway pre-registers the public key so the device is trusted on first connect.
+
+Use `--stdout` to print the values instead of writing to `.env`.
+
+### 3. Start
 
 **In foreground (see logs in real-time):**
 ```bash

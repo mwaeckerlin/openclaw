@@ -67,6 +67,7 @@ services:
     environment:
       OPENCLAW_SANDBOX_SSH_PUBLIC_KEY: ${OPENCLAW_SANDBOX_SSH_PUBLIC_KEY:-}
       DOCKER_HOST: tcp://openclaw-dind:2375
+      OPENCLAW_MCP_GATEWAY_URL: http://openclaw-mcp-gateway:4000
     volumes:
       - openclaw-workspace:/home/somebody
     security_opt:
@@ -104,17 +105,7 @@ services:
     networks:
       - sandbox-dind
 
-  allow-write-access:
-    image: mwaeckerlin/allow-write-access
-    environment:
-      ALLOW_USER: "chown -R 1000:1000"
-    volumes:
-      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/app
-
   openclaw-mcp-gateway:
-    build:
-      context: ../openclaw-mcp-gateway
-      dockerfile: Dockerfile
     image: mwaeckerlin/openclaw-mcp-gateway
     depends_on:
       openclaw-gateway:
@@ -122,16 +113,20 @@ services:
     environment:
       OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
-      OPENCLAW_MCP_PORT: ${OPENCLAW_MCP_PORT:-4000}
-      OPENCLAW_MCP_HOST: ${OPENCLAW_MCP_HOST:-0.0.0.0}
-    ports:
-      - "${OPENCLAW_MCP_PORT:-4000}:${OPENCLAW_MCP_PORT:-4000}"
+      OPENCLAW_DEVICE_IDENTITY: ${OPENCLAW_DEVICE_IDENTITY:-}
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     networks:
       - gateway-mcp
       - sandbox-mcp
+
+  allow-write-access:
+    image: mwaeckerlin/allow-write-access
+    environment:
+      ALLOW_USER: "chown -R 1000:1000"
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/app
 
 networks:
   gateway-sandbox:
