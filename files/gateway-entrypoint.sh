@@ -33,7 +33,7 @@ if [ -n "$OPENCLAW_DEVICE_PAIRING" ]; then
   echo "==== Pre-Seeding Device Pairing ===="
   _state_dir="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
   mkdir -p "$_state_dir/devices"
-  printf '%s' "$OPENCLAW_DEVICE_PAIRING" > "$_state_dir/devices/paired.json"
+  printf '%b' "$OPENCLAW_DEVICE_PAIRING" > "$_state_dir/devices/paired.json"
   echo "Device pairing written to $_state_dir/devices/paired.json"
 fi
 

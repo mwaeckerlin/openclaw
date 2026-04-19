@@ -184,6 +184,26 @@
         "enabled": true
       },
 {% endif %}
+{% if OPENCLAW_GITHUB_TOKEN | default('') | length > 0 %}
+      "acpx": {
+        "enabled": true,
+        "config": {
+          "mcpServers": {
+            "github": {
+              "command": "npx",
+              "args": ["-y", "@modelcontextprotocol/server-github"],
+              "env": {
+                "GITHUB_PERSONAL_ACCESS_TOKEN": {
+                  "source": "env",
+                  "provider": "default",
+                  "id": "OPENCLAW_GITHUB_TOKEN"
+                }
+              }
+            }
+          }
+        }
+      },
+{% endif %}
       "_end": true
     }
   },
