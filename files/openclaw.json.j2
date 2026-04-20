@@ -533,20 +533,38 @@
         "enabled": {{ OPENCLAW_DUCKDUCKGO_ENABLED | default('true', true) }}
       },
 {% endif %}
-{% if OPENCLAW_GITHUB_TOKEN | default('') | length > 0 %}
+{% if OPENCLAW_GITHUB_TOKEN | default('') | length > 0 or (OPENCLAW_GITEA_TOKEN | default('') | length > 0 and OPENCLAW_GITEA_HOST | default('') | length > 0) %}
       "acpx": {
         "enabled": {{ OPENCLAW_ACPX_ENABLED | default('true', true) }},
         "config": {
           "permissionMode": "approve-all",
           "pluginToolsMcpBridge": true,
           "mcpServers": {
+{% if OPENCLAW_GITHUB_TOKEN | default('') | length > 0 %}
             "github": {
               "command": "{{ OPENCLAW_ACPX_GITHUB_COMMAND | default('npx', true) }}",
               "args": {{ OPENCLAW_ACPX_GITHUB_ARGS_JSON | default('["-y", "@modelcontextprotocol/server-github"]', true) }},
               "env": {
                 "GITHUB_PERSONAL_ACCESS_TOKEN": "${OPENCLAW_GITHUB_TOKEN}"
               }
-            }
+            },
+{% endif %}
+{% if OPENCLAW_GITEA_TOKEN | default('') | length > 0 and OPENCLAW_GITEA_HOST | default('') | length > 0 %}
+            "gitea": {
+              "command": "{{ OPENCLAW_ACPX_GITEA_COMMAND | default('gitea-mcp', true) }}",
+{% if OPENCLAW_ACPX_GITEA_ARGS_JSON | default('') | length > 0 %}
+              "args": {{ OPENCLAW_ACPX_GITEA_ARGS_JSON }},
+{% else %}
+              "args": ["-t", "stdio", "--host", "{{ OPENCLAW_GITEA_HOST }}"],
+{% endif %}
+              "env": {
+                "GITEA_ACCESS_TOKEN": "${OPENCLAW_GITEA_TOKEN}"{% if OPENCLAW_GITEA_INSECURE | default('') | length > 0 %},
+                "GITEA_INSECURE": "{{ OPENCLAW_GITEA_INSECURE }}"
+{% endif %}
+              }
+            },
+{% endif %}
+            "_end": true
           }
         }
       },

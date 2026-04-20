@@ -161,6 +161,9 @@ This means any Docker Secret is automatically available as an environment variab
 | `OPENCLAW_ELEVENLABS_API_KEY` | — | ElevenLabs API key; enables TTS via ElevenLabs (else Microsoft TTS) |
 | `OPENCLAW_NOTION_API_KEY` | — | Notion API key; enables Notion skill |
 | `OPENCLAW_GITHUB_TOKEN` | — | GitHub personal access token; enables GitHub MCP server via ACPX (token stays gateway-side, sandbox only sees MCP tools) |
+| `OPENCLAW_GITEA_HOST` | — | Gitea host URL for ACPX MCP server setup |
+| `OPENCLAW_GITEA_TOKEN` | — | Gitea personal access token; enables Gitea MCP server via ACPX |
+| `OPENCLAW_GITEA_INSECURE` | — | Optional Gitea MCP setting (`GITEA_INSECURE`) |
 | `OPENCLAW_TRELLO_API_KEY` | — | Trello API key; enables Trello skill |
 | `OPENCLAW_TELEGRAM_BOT_TOKEN` | — | Telegram bot token; enables Telegram channel |
 | `OPENCLAW_DISCORD_BOT_TOKEN` | — | Discord bot token; enables Discord channel |
@@ -267,6 +270,8 @@ Wichtige Gruppen:
 - Messages/commands/hooks: `OPENCLAW_TTS_*`, `OPENCLAW_MESSAGES_QUEUE_*`, `OPENCLAW_COMMANDS_*`, `OPENCLAW_HOOKS_*`
 - Channels: `OPENCLAW_TELEGRAM_*`, `OPENCLAW_DISCORD_*`, `OPENCLAW_SLACK_*`
 - Gateway: `OPENCLAW_GATEWAY_MODE`, `OPENCLAW_GATEWAY_BIND`, `OPENCLAW_GATEWAY_INTERNAL_PORT`, `OPENCLAW_GATEWAY_AUTH_MODE`, `OPENCLAW_CONTROL_UI_*`, `OPENCLAW_TAILSCALE_*`, `OPENCLAW_TRUSTED_PROXIES_JSON`
+- ACPX/MCP: `OPENCLAW_ACPX_*`, `OPENCLAW_GITHUB_TOKEN`, `OPENCLAW_GITEA_HOST`, `OPENCLAW_GITEA_TOKEN`, `OPENCLAW_GITEA_INSECURE`
+- Sandbox bridge env: `OPENCLAW_MCP_GATEWAY_URL`
 
 Token/Secret-basierte Channels haben bewusst **kein** separates `*_ENABLED`: das Token/Secret ist der Enabler.
 
@@ -387,6 +392,12 @@ OPENCLAW_DUCKDUCKGO_ENABLED
 OPENCLAW_ACPX_ENABLED
 OPENCLAW_ACPX_GITHUB_COMMAND
 OPENCLAW_ACPX_GITHUB_ARGS_JSON
+OPENCLAW_ACPX_GITEA_COMMAND
+OPENCLAW_ACPX_GITEA_ARGS_JSON
+OPENCLAW_GITEA_HOST
+OPENCLAW_GITEA_TOKEN
+OPENCLAW_GITEA_INSECURE
+OPENCLAW_MCP_GATEWAY_URL
 OPENCLAW_PLUGIN_ENTRIES_JSON
 OPENCLAW_PLUGIN_SPECS_JSON
 OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED
@@ -456,7 +467,7 @@ Then provide secrets via docker secret or mounted `/run/secrets/*` files.
 - **Search Plugin**: Brave if `OPENCLAW_BRAVE_API_KEY` set, else DuckDuckGo (always present)
 - **Cron Scheduler**: Enabled by default (`OPENCLAW_CRON_ENABLED=true`); set to `false` to disable
 - **Channels**: Telegram, Discord, Slack, Google Chat, Mattermost, Matrix, Microsoft Teams, BlueBubbles are enabled by credentials/secrets; WhatsApp, Signal, iMessage, IRC by explicit channel config flags
-- **GitHub**: Enabled if `OPENCLAW_GITHUB_TOKEN` set; configures `@modelcontextprotocol/server-github` as ACPX MCP server (token stays gateway-side, sandbox only sees MCP tools)
+- **GitHub/Gitea (ACPX)**: GitHub MCP server is included when `OPENCLAW_GITHUB_TOKEN` is set; Gitea MCP server is included when `OPENCLAW_GITEA_HOST` and `OPENCLAW_GITEA_TOKEN` are set
 - **Skills**: Notion, Trello, ElevenLabs, OpenAI Whisper — only included if API keys provided
 - **Plugins (generic)**: Any plugin config in `plugins.entries` is supported via `OPENCLAW_PLUGINS_JSON` or `OPENCLAW_PLUGIN_ENTRIES_JSON`; configured plugin IDs can be auto-installed on startup
 
