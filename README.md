@@ -1,8 +1,8 @@
 # OpenClaw — Gateway + SSH Sandbox
 
-Combine OpenClaw with Security and Easiness! Run out of the box a secure docker based sandboxed OpenClaw, locally or in a cloud.
+Run OpenClaw in a Docker-based sandboxed setup, locally or in cloud environments.
 
-**It has never been so easy to run a secure sandboxed pre-configured OpenClaw!** — Just write some configuration variables in `.env`, run `npm start` and get your instance at: `http://localhost:18789/`
+Set configuration variables in `.env`, run `npm start`, and access the instance at `http://localhost:18789/`.
 
 For a simple `.env` setup, see [Development Setup](#development-setup) below.
 
@@ -148,8 +148,10 @@ This means any Docker Secret is automatically available as an environment variab
 | `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` | yes | SSH public key (ed25519) for sandbox access |
 | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` | yes | SSH private key, `\n`-encoded (gateway → sandbox) |
 | `OPENAI_API_KEY` | no | OpenAI API key; enables OpenAI provider, Whisper audio transcription, and is used as default model provider if `LITELLM_MASTER_KEY` is not set |
+| `OPENCLAW_WHISPER_API_KEY` | no | Whisper API key override; if unset and `OPENAI_API_KEY` is set, it is derived from `OPENAI_API_KEY` |
 | `OVERWRITE_CONFIG` | no | If set, overwrite `openclaw.json` with the baked-in default on every start |
 | `OPENCLAW_CONFIG_DIR` | no | Host path for config (default: Docker volume) |
+| `OPENCLAW_STATE_DIR` | no | OpenClaw state directory path inside the gateway container (defaults to `~/.openclaw`) |
 | `OPENCLAW_GATEWAY_PORT` | no | Gateway port (default: 18789) |
 
 ### Optional Feature Enablement (via API Keys)
@@ -163,7 +165,20 @@ This means any Docker Secret is automatically available as an environment variab
 | `OPENCLAW_TELEGRAM_BOT_TOKEN` | — | Telegram bot token; enables Telegram channel |
 | `OPENCLAW_DISCORD_BOT_TOKEN` | — | Discord bot token; enables Discord channel |
 | `OPENCLAW_SLACK_BOT_TOKEN` | — | Slack bot token; enables Slack channel |
+| `OPENCLAW_SLACK_APP_TOKEN` | — | Slack app token for socket mode (`channels.slack.appToken`) |
 | `OPENCLAW_BRAVE_API_KEY` | — | Brave Search API key; enables Brave plugin (else DuckDuckGo) |
+| `OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_JSON` | — | Google Chat service account JSON; enables Google Chat channel |
+| `OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_FILE` | — | Path to Google Chat service account file |
+| `OPENCLAW_MATTERMOST_BOT_TOKEN` | — | Mattermost bot token; enables Mattermost channel |
+| `OPENCLAW_MATTERMOST_BASE_URL` | — | Mattermost base URL |
+| `OPENCLAW_MATRIX_HOMESERVER` | — | Matrix homeserver URL |
+| `OPENCLAW_MATRIX_ACCESS_TOKEN` | — | Matrix access token; enables Matrix channel |
+| `OPENCLAW_MSTEAMS_APP_ID` | — | Microsoft Teams app ID |
+| `OPENCLAW_MSTEAMS_APP_PASSWORD` | — | Microsoft Teams app password |
+| `OPENCLAW_MSTEAMS_TENANT_ID` | — | Microsoft Teams tenant ID |
+| `OPENCLAW_BLUEBUBBLES_SERVER_URL` | — | BlueBubbles server URL |
+| `OPENCLAW_BLUEBUBBLES_PASSWORD` | — | BlueBubbles password |
+| `OPENCLAW_IRC_NICKSERV_PASSWORD` | — | IRC NickServ password |
 
 ### LiteLLM Configuration (Optional)
 
@@ -175,14 +190,19 @@ When `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the d
 | `LITELLM_URL` | — | Base URL of LiteLLM proxy for model discovery |
 | `LITELLM_BASE_URL` | `http://litellm:4000` | Base URL for connecting to LiteLLM |
 
+When configured, model lists are discovered dynamically from providers:
+
+- LiteLLM: `LITELLM_URL/v1/models` → `models.providers.litellm.models`
+- OpenAI: `${OPENCLAW_OPENAI_BASE_URL:-https://api.openai.com/v1}/models` → `models.providers.openai.models` (unless `OPENCLAW_OPENAI_MODELS_JSON` is explicitly set)
+
 ### Agent & Model Configuration
 
 | Variable | Default | Description |
 |---|---|---|
 | `OPENCLAW_PRIMARY_MODEL` | _(auto)_ | Default LLM model; auto-selects `litellm/openrouter/anthropic/claude-sonnet-4` if LiteLLM is configured, else `openai/gpt-4o` |
-| `OPENCLAW_HEARTBEAT_INTERVAL` | `0` | Cron expression for agent heartbeat (empty = disabled) |
+| `OPENCLAW_HEARTBEAT_INTERVAL` | `0s` | Duration for agent heartbeat (e.g. `30m`, `2h`, `0s` = disabled) |
 | `OPENCLAW_TIMEOUT_SECONDS` | `300` | Agent execution timeout in seconds |
-| `OPENCLAW_MAX_CONCURRENT` | `1` | Maximum concurrent agents |
+| `OPENCLAW_MAX_CONCURRENT` | `5` | Maximum concurrent agents |
 | `OPENCLAW_CRON_ENABLED` | `true` | Enable cron scheduler support |
 | `OPENCLAW_BASE_PATH` | _(empty)_ | Base path for Control UI (e.g. `/openclaw` behind reverse proxy) |
 | `OPENCLAW_AGENT_SCOPE` | `agent` | Sandbox scope for agent sessions; allowed: `session`, `agent`, `shared` |
@@ -190,9 +210,205 @@ When `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the d
 | `OPENCLAW_SESSION_VISIBILITY` | `agent` | Session visibility for tools; allowed: `agent`, `global` |
 | `OPENCLAW_SESSION_TOOLS_VISIBILITY` | `all` | Which tools are visible in sandbox sessions; allowed: `all`, `none` |
 
+### Plugin Configuration & Installation
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENCLAW_PLUGINS_JSON` | — | Full `plugins` section as JSON |
+| `OPENCLAW_PLUGIN_ENTRIES_JSON` | — | Additional `plugins.entries` object merged into the generated config |
+| `OPENCLAW_PLUGIN_SPECS_JSON` | — | Map `{ "<pluginId>": "<install-spec>" }` for plugin auto-install resolution |
+| `OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED` | `true` | Auto-install plugin specs referenced in `plugins.entries` when not installed |
+| `OPENCLAW_PLUGIN_AUTO_INSTALL_STRICT` | `false` | Fail startup when a plugin install fails |
+| `OPENCLAW_PLUGIN_AUTO_INSTALL_PREFIX` | `@openclaw/` | Default prefix used when no explicit spec is provided |
+| `OPENCLAW_PLUGIN_AUTO_INSTALL_SKIP_JSON` | `["acpx","brave","duckduckgo"]` | Plugin ID list excluded from auto-install |
+| `PLUGINS` | — | Manual install spec passed to `openclaw plugins install` |
+
+Example:
+
+```bash
+OPENCLAW_PLUGIN_ENTRIES_JSON='{"matrix":{"enabled":true,"config":{"homeserver":"https://matrix.example","accessToken":"${OPENCLAW_MATRIX_ACCESS_TOKEN}"}}}'
+OPENCLAW_PLUGIN_SPECS_JSON='{"matrix":"@openclaw/matrix"}'
+OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED=true
+```
+
+### Full OpenClaw Config Coverage (Schema Roots)
+
+Each root section in `files/openclaw.json.j2` is configurable via a section JSON variable:
+
+`OPENCLAW_<SECTION>_JSON`
+
+Example:
+
+```bash
+OPENCLAW_GATEWAY_JSON='{"mode":"local","bind":"lan","port":18789,"auth":{"mode":"token","token":"${OPENCLAW_GATEWAY_TOKEN}"},"trustedProxies":["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]}'
+```
+
+Supported section variables (from official OpenClaw schema roots):
+
+`OPENCLAW_META_JSON`, `OPENCLAW_ENV_JSON`, `OPENCLAW_WIZARD_JSON`, `OPENCLAW_DIAGNOSTICS_JSON`, `OPENCLAW_LOGGING_JSON`, `OPENCLAW_CLI_JSON`, `OPENCLAW_UPDATE_JSON`, `OPENCLAW_BROWSER_JSON`, `OPENCLAW_UI_JSON`, `OPENCLAW_SECRETS_JSON`, `OPENCLAW_AUTH_JSON`, `OPENCLAW_ACP_JSON`, `OPENCLAW_MODELS_JSON`, `OPENCLAW_NODE_HOST_JSON`, `OPENCLAW_AGENTS_JSON`, `OPENCLAW_TOOLS_JSON`, `OPENCLAW_BINDINGS_JSON`, `OPENCLAW_BROADCAST_JSON`, `OPENCLAW_AUDIO_JSON`, `OPENCLAW_MEDIA_JSON`, `OPENCLAW_MESSAGES_JSON`, `OPENCLAW_COMMANDS_JSON`, `OPENCLAW_APPROVALS_JSON`, `OPENCLAW_SESSION_JSON`, `OPENCLAW_CRON_JSON`, `OPENCLAW_HOOKS_JSON`, `OPENCLAW_WEB_JSON`, `OPENCLAW_CHANNELS_JSON`, `OPENCLAW_DISCOVERY_JSON`, `OPENCLAW_CANVAS_HOST_JSON`, `OPENCLAW_TALK_JSON`, `OPENCLAW_GATEWAY_JSON`, `OPENCLAW_MEMORY_JSON`, `OPENCLAW_MCP_JSON`, `OPENCLAW_SKILLS_JSON`, `OPENCLAW_PLUGINS_JSON`.
+
+If `OPENCLAW_<SECTION>_JSON` is set, it replaces that full section from the template.
+If not set, the template defaults and feature toggles apply.
+
+Plugin configurations are supported in two modes:
+
+- complete plugin section replacement via `OPENCLAW_PLUGINS_JSON`
+- additive plugin entry mapping via `OPENCLAW_PLUGIN_ENTRIES_JSON`
+
+### Individual Overrides (Per-Parameter)
+
+Neben den Block-Overrides sind die meisten sinnvollen Einzelwerte direkt per ENV überschreibbar (ohne die SSH-Sandbox-Zielstruktur aufzuweichen).
+
+Wichtige Gruppen:
+
+- Models/Provider: `OPENCLAW_MODELS_MODE`, `OPENCLAW_LITELLM_API`, `OPENCLAW_LITELLM_MODELS_JSON`, `OPENCLAW_OPENAI_BASE_URL`, `OPENCLAW_OPENAI_MODELS_JSON`, `OPENCLAW_AGENT_MODELS_JSON`
+- Agent runtime: `OPENCLAW_AGENT_SANDBOX_MODE`, `OPENCLAW_AGENT_WORKSPACE_ACCESS`, `OPENCLAW_SUBAGENT_TIMEOUT_SECONDS`, `OPENCLAW_SUBAGENT_MAX_CONCURRENT`
+- Tools/media: `OPENCLAW_TOOLS_FS_WORKSPACE_ONLY`, `OPENCLAW_LOOP_DETECTION_*`, `OPENCLAW_MEDIA_AUDIO_*`
+- Messages/commands/hooks: `OPENCLAW_TTS_*`, `OPENCLAW_MESSAGES_QUEUE_*`, `OPENCLAW_COMMANDS_*`, `OPENCLAW_HOOKS_*`
+- Channels: `OPENCLAW_TELEGRAM_*`, `OPENCLAW_DISCORD_*`, `OPENCLAW_SLACK_*`
+- Gateway: `OPENCLAW_GATEWAY_MODE`, `OPENCLAW_GATEWAY_BIND`, `OPENCLAW_GATEWAY_INTERNAL_PORT`, `OPENCLAW_GATEWAY_AUTH_MODE`, `OPENCLAW_CONTROL_UI_*`, `OPENCLAW_TAILSCALE_*`, `OPENCLAW_TRUSTED_PROXIES_JSON`
+
+Token/Secret-basierte Channels haben bewusst **kein** separates `*_ENABLED`: das Token/Secret ist der Enabler.
+
+Vollständige Liste der Einzel-Overrides:
+
+```bash
+OPENCLAW_LOGGING_LEVEL
+OPENCLAW_AUTH_PROFILE_PROVIDER
+OPENCLAW_AUTH_PROFILE_MODE
+OPENCLAW_MODELS_MODE
+OPENCLAW_LITELLM_API
+OPENCLAW_LITELLM_MODELS_JSON
+OPENCLAW_OPENAI_BASE_URL
+OPENCLAW_OPENAI_MODELS_JSON
+OPENCLAW_AGENT_SANDBOX_MODE
+OPENCLAW_AGENT_WORKSPACE_ACCESS
+OPENCLAW_AGENT_MODELS_JSON
+OPENCLAW_SUBAGENT_TIMEOUT_SECONDS
+OPENCLAW_SUBAGENT_MAX_CONCURRENT
+OPENCLAW_TOOLS_FS_WORKSPACE_ONLY
+OPENCLAW_LOOP_DETECTION_ENABLED
+OPENCLAW_LOOP_DETECTION_WARNING_THRESHOLD
+OPENCLAW_LOOP_DETECTION_CRITICAL_THRESHOLD
+OPENCLAW_LOOP_DETECTION_GLOBAL_CIRCUIT_BREAKER_THRESHOLD
+OPENCLAW_MEDIA_AUDIO_ENABLED
+OPENCLAW_MEDIA_AUDIO_ECHO_TRANSCRIPT
+OPENCLAW_MEDIA_AUDIO_PROVIDER
+OPENCLAW_MEDIA_AUDIO_MODEL
+OPENCLAW_TTS_AUTO
+OPENCLAW_TTS_PROVIDER
+OPENCLAW_TTS_MODEL_OVERRIDES_ENABLED
+OPENCLAW_MESSAGES_QUEUE_DEBOUNCE_MS
+OPENCLAW_MESSAGES_QUEUE_CAP
+OPENCLAW_COMMANDS_NATIVE
+OPENCLAW_COMMANDS_NATIVE_SKILLS
+OPENCLAW_COMMANDS_RESTART
+OPENCLAW_COMMANDS_OWNER_DISPLAY
+OPENCLAW_HOOKS_INTERNAL_ENABLED
+OPENCLAW_HOOKS_COMMAND_LOGGER_ENABLED
+OPENCLAW_HOOKS_SESSION_MEMORY_ENABLED
+OPENCLAW_HOOKS_BOOTSTRAP_EXTRA_FILES_ENABLED
+OPENCLAW_HOOKS_BOOT_MD_ENABLED
+OPENCLAW_TELEGRAM_DM_POLICY
+OPENCLAW_TELEGRAM_ALLOW_FROM_JSON
+OPENCLAW_TELEGRAM_GROUPS_JSON
+OPENCLAW_TELEGRAM_GROUP_POLICY
+OPENCLAW_TELEGRAM_STREAMING_MODE
+OPENCLAW_DISCORD_DM_POLICY
+OPENCLAW_DISCORD_ALLOW_FROM_JSON
+OPENCLAW_DISCORD_STREAMING_MODE
+OPENCLAW_SLACK_APP_TOKEN
+OPENCLAW_SLACK_DM_POLICY
+OPENCLAW_SLACK_ALLOW_FROM_JSON
+OPENCLAW_SLACK_NATIVE_TRANSPORT
+OPENCLAW_SLACK_STREAMING_MODE
+OPENCLAW_WHATSAPP_ENABLED
+OPENCLAW_WHATSAPP_DM_POLICY
+OPENCLAW_WHATSAPP_ALLOW_FROM_JSON
+OPENCLAW_WHATSAPP_TEXT_CHUNK_LIMIT
+OPENCLAW_WHATSAPP_CHUNK_MODE
+OPENCLAW_WHATSAPP_MEDIA_MAX_MB
+OPENCLAW_WHATSAPP_SEND_READ_RECEIPTS
+OPENCLAW_WHATSAPP_GROUPS_JSON
+OPENCLAW_WHATSAPP_GROUP_POLICY
+OPENCLAW_CHANNEL_DEFAULTS_JSON
+OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_JSON
+OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_FILE
+OPENCLAW_GOOGLECHAT_DM_ENABLED
+OPENCLAW_GOOGLECHAT_DM_POLICY
+OPENCLAW_GOOGLECHAT_ALLOW_FROM_JSON
+OPENCLAW_GOOGLECHAT_GROUP_POLICY
+OPENCLAW_MATTERMOST_BOT_TOKEN
+OPENCLAW_MATTERMOST_BASE_URL
+OPENCLAW_MATTERMOST_DM_POLICY
+OPENCLAW_SIGNAL_ENABLED
+OPENCLAW_SIGNAL_ACCOUNT
+OPENCLAW_SIGNAL_DM_POLICY
+OPENCLAW_SIGNAL_ALLOW_FROM_JSON
+OPENCLAW_BLUEBUBBLES_DM_POLICY
+OPENCLAW_BLUEBUBBLES_SERVER_URL
+OPENCLAW_BLUEBUBBLES_PASSWORD
+OPENCLAW_IMESSAGE_ENABLED
+OPENCLAW_IMESSAGE_DM_POLICY
+OPENCLAW_IMESSAGE_ALLOW_FROM_JSON
+OPENCLAW_MATRIX_HOMESERVER
+OPENCLAW_MATRIX_ACCESS_TOKEN
+OPENCLAW_MSTEAMS_CONFIG_WRITES
+OPENCLAW_MSTEAMS_APP_ID
+OPENCLAW_MSTEAMS_APP_PASSWORD
+OPENCLAW_MSTEAMS_TENANT_ID
+OPENCLAW_IRC_ENABLED
+OPENCLAW_IRC_DM_POLICY
+OPENCLAW_IRC_CONFIG_WRITES
+OPENCLAW_IRC_HOST
+OPENCLAW_IRC_PORT
+OPENCLAW_IRC_TLS
+OPENCLAW_IRC_NICKSERV_ENABLED
+OPENCLAW_IRC_NICKSERV_SERVICE
+OPENCLAW_IRC_NICKSERV_PASSWORD
+OPENCLAW_IRC_NICKSERV_REGISTER
+OPENCLAW_IRC_NICKSERV_REGISTER_EMAIL
+OPENCLAW_EXTRA_CHANNELS_JSON
+OPENCLAW_GATEWAY_MODE
+OPENCLAW_GATEWAY_BIND
+OPENCLAW_GATEWAY_INTERNAL_PORT
+OPENCLAW_GATEWAY_AUTH_MODE
+OPENCLAW_CONTROL_UI_ENABLED
+OPENCLAW_CONTROL_UI_ALLOW_HOST_HEADER_ORIGIN_FALLBACK
+OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH
+OPENCLAW_CONTROL_UI_DISABLE_DEVICE_AUTH
+OPENCLAW_ALLOWED_ORIGINS_JSON
+OPENCLAW_TAILSCALE_MODE
+OPENCLAW_TAILSCALE_RESET_ON_EXIT
+OPENCLAW_TRUSTED_PROXIES_JSON
+OPENCLAW_SKILLS_INSTALL_NODE_MANAGER
+OPENCLAW_BRAVE_ENABLED
+OPENCLAW_DUCKDUCKGO_ENABLED
+OPENCLAW_ACPX_ENABLED
+OPENCLAW_ACPX_GITHUB_COMMAND
+OPENCLAW_ACPX_GITHUB_ARGS_JSON
+OPENCLAW_PLUGIN_ENTRIES_JSON
+OPENCLAW_PLUGIN_SPECS_JSON
+OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED
+OPENCLAW_PLUGIN_AUTO_INSTALL_STRICT
+OPENCLAW_PLUGIN_AUTO_INSTALL_PREFIX
+OPENCLAW_PLUGIN_AUTO_INSTALL_SKIP_JSON
+PLUGINS
+```
+
+Pflichtpunkt ohne Default-Hardcoding:
+
+- `OPENCLAW_ALLOWED_ORIGINS_JSON` setzt `gateway.controlUi.allowedOrigins`.
+- Es gibt dafür **keinen** eingebauten Default mehr; wenn nicht gesetzt, wird `allowedOrigins` nicht in die Config geschrieben.
+
+Model-Handling:
+
+- Agent-Model-Mappings sind über `OPENCLAW_AGENT_MODELS_JSON` konfigurierbar.
+- Provider-Modelle werden generisch über den jeweiligen Provider geführt (`models.providers.*.models`, LiteLLM Discovery via `LITELLM_URL` + `LITELLM_MASTER_KEY`).
+
 ### Configuration Features
 
-The OpenClaw configuration is now **Jinja2-templated**, allowing dynamic feature enablement based on environment variables. Features are **only included in the generated config if their corresponding API keys are provided**.
+The OpenClaw configuration is **Jinja2-templated**, allowing dynamic feature enablement based on environment variables. Features are **only included in the generated config if their corresponding API keys are provided**.
 
 **Examples:**
 
@@ -232,16 +448,23 @@ Then provide secrets via docker secret or mounted `/run/secrets/*` files.
 
 #### Conditional Features
 
-- **LiteLLM**: Enabled if `LITELLM_MASTER_KEY` set; adds LiteLLM provider, auth profile, and model aliases
+- **LiteLLM**: Enabled if `LITELLM_MASTER_KEY` set; adds LiteLLM provider and auth profile
 - **OpenAI**: Enabled if `OPENAI_API_KEY` set; adds OpenAI provider
 - **Default Model**: `litellm/openrouter/anthropic/claude-sonnet-4` with LiteLLM, `openai/gpt-4o` without; override with `OPENCLAW_PRIMARY_MODEL`
 - **Audio (Whisper)**: Enabled if `OPENAI_API_KEY` set
 - **TTS Provider**: ElevenLabs if `OPENCLAW_ELEVENLABS_API_KEY` set, else Microsoft
 - **Search Plugin**: Brave if `OPENCLAW_BRAVE_API_KEY` set, else DuckDuckGo (always present)
 - **Cron Scheduler**: Enabled by default (`OPENCLAW_CRON_ENABLED=true`); set to `false` to disable
-- **Channels**: Telegram, Discord, Slack — only included if bot tokens provided
+- **Channels**: Telegram, Discord, Slack, Google Chat, Mattermost, Matrix, Microsoft Teams, BlueBubbles are enabled by credentials/secrets; WhatsApp, Signal, iMessage, IRC by explicit channel config flags
 - **GitHub**: Enabled if `OPENCLAW_GITHUB_TOKEN` set; configures `@modelcontextprotocol/server-github` as ACPX MCP server (token stays gateway-side, sandbox only sees MCP tools)
 - **Skills**: Notion, Trello, ElevenLabs, OpenAI Whisper — only included if API keys provided
+- **Plugins (generic)**: Any plugin config in `plugins.entries` is supported via `OPENCLAW_PLUGINS_JSON` or `OPENCLAW_PLUGIN_ENTRIES_JSON`; configured plugin IDs can be auto-installed on startup
+
+#### Schema Source
+
+The full section list above is taken from the official OpenClaw config schema in `openclaw/openclaw`:
+
+- `src/config/schema.base.generated.ts` (branch `main`, commit `d63671fce0ce60a87fdf073b2d7a47ac4f9e04ef`)
 
 ## Custom Configuration
 
@@ -316,7 +539,7 @@ The `openclaw-dind` service provides an isolated Docker daemon for the sandbox. 
 
 ### DinD in Docker Swarm
 
-Docker Swarm does not support `privileged: true` in stack deploy files. Haven't found a solution yet for Docker-in-Docker in Docker Swarm.
+Docker Swarm does not support `privileged: true` in stack deploy files. Docker-in-Docker is therefore not supported in this Swarm setup.
 
 ## Architecture
 

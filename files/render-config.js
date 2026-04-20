@@ -54,6 +54,29 @@ try {
     config.channels = channels;
   }
 
+  // Merge plugins_* helper sections into plugins.entries (if present)
+  const pluginEntryMaps = [];
+  for (const key of Object.keys(config)) {
+    if (key.startsWith('plugins_')) {
+      const section = config[key];
+      if (section && typeof section === 'object' && section.entries && typeof section.entries === 'object') {
+        pluginEntryMaps.push(section.entries);
+      }
+      delete config[key];
+    }
+  }
+  if (pluginEntryMaps.length > 0) {
+    if (!config.plugins || typeof config.plugins !== 'object') {
+      config.plugins = {};
+    }
+    if (!config.plugins.entries || typeof config.plugins.entries !== 'object') {
+      config.plugins.entries = {};
+    }
+    for (const entries of pluginEntryMaps) {
+      Object.assign(config.plugins.entries, entries);
+    }
+  }
+
   fs.writeFileSync(outputFile, JSON.stringify(config, null, 2));
   console.log(`Configuration rendered to ${outputFile}`);
 } catch (error) {
