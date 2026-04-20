@@ -1,42 +1,91 @@
 {
-{% if LITELLM_MASTER_KEY | default('') | length > 0 %}
+{% if OPENCLAW_META_JSON | default('') | length > 0 %}
+  "meta": {{ OPENCLAW_META_JSON }},
+{% endif %}
+{% if OPENCLAW_ENV_JSON | default('') | length > 0 %}
+  "env": {{ OPENCLAW_ENV_JSON }},
+{% endif %}
+{% if OPENCLAW_WIZARD_JSON | default('') | length > 0 %}
+  "wizard": {{ OPENCLAW_WIZARD_JSON }},
+{% endif %}
+{% if OPENCLAW_DIAGNOSTICS_JSON | default('') | length > 0 %}
+  "diagnostics": {{ OPENCLAW_DIAGNOSTICS_JSON }},
+{% endif %}
+{% if OPENCLAW_LOGGING_JSON | default('') | length > 0 %}
+  "logging": {{ OPENCLAW_LOGGING_JSON }},
+{% else %}
+  "logging": {
+    "level": "{{ OPENCLAW_LOGGING_LEVEL | default('debug', true) }}"
+  },
+{% endif %}
+{% if OPENCLAW_CLI_JSON | default('') | length > 0 %}
+  "cli": {{ OPENCLAW_CLI_JSON }},
+{% endif %}
+{% if OPENCLAW_UPDATE_JSON | default('') | length > 0 %}
+  "update": {{ OPENCLAW_UPDATE_JSON }},
+{% endif %}
+{% if OPENCLAW_BROWSER_JSON | default('') | length > 0 %}
+  "browser": {{ OPENCLAW_BROWSER_JSON }},
+{% endif %}
+{% if OPENCLAW_UI_JSON | default('') | length > 0 %}
+  "ui": {{ OPENCLAW_UI_JSON }},
+{% endif %}
+{% if OPENCLAW_SECRETS_JSON | default('') | length > 0 %}
+  "secrets": {{ OPENCLAW_SECRETS_JSON }},
+{% endif %}
+{% if OPENCLAW_AUTH_JSON | default('') | length > 0 %}
+  "auth": {{ OPENCLAW_AUTH_JSON }},
+{% elif LITELLM_MASTER_KEY | default('') | length > 0 %}
   "auth": {
     "profiles": {
       "litellm:default": {
-        "provider": "litellm",
-        "mode": "api_key"
+        "provider": "{{ OPENCLAW_AUTH_PROFILE_PROVIDER | default('litellm', true) }}",
+        "mode": "{{ OPENCLAW_AUTH_PROFILE_MODE | default('api_key', true) }}"
       }
     }
   },
 {% endif %}
+{% if OPENCLAW_ACP_JSON | default('') | length > 0 %}
+  "acp": {{ OPENCLAW_ACP_JSON }},
+{% endif %}
+{% if OPENCLAW_MODELS_JSON | default('') | length > 0 %}
+  "models": {{ OPENCLAW_MODELS_JSON }},
+{% else %}
   "models": {
-    "mode": "merge",
+    "mode": "{{ OPENCLAW_MODELS_MODE | default('replace', true) }}",
     "providers": {
 {% if LITELLM_MASTER_KEY | default('') | length > 0 %}
       "litellm": {
         "baseUrl": "{{ LITELLM_BASE_URL | default('http://litellm:4000', true) }}",
-        "api": "openai-completions",
+        "api": "{{ OPENCLAW_LITELLM_API | default('openai-completions', true) }}",
         "apiKey": "${LITELLM_MASTER_KEY}",
-        "models": []
+        "models": {{ OPENCLAW_LITELLM_MODELS_JSON | default('[]', true) }}
       },
 {% endif %}
 {% if OPENAI_API_KEY | default('') | length > 0 %}
       "openai": {
-        "baseUrl": "https://api.openai.com/v1",
+        "baseUrl": "{{ OPENCLAW_OPENAI_BASE_URL | default('https://api.openai.com/v1', true) }}",
         "apiKey": "${OPENAI_API_KEY}",
-        "models": []
+        "models": {{ OPENCLAW_OPENAI_MODELS_JSON | default('[]', true) }}
       },
 {% endif %}
       "_end": true
     }
   },
+{% endif %}
+{% if OPENCLAW_NODE_HOST_JSON | default('') | length > 0 %}
+  "nodeHost": {{ OPENCLAW_NODE_HOST_JSON }},
+{% endif %}
+{% if OPENCLAW_AGENTS_JSON | default('') | length > 0 %}
+  "agents": {{ OPENCLAW_AGENTS_JSON }},
+{% else %}
   "agents": {
     "defaults": {
       "sandbox": {
-        "mode": "all",
+        "mode": "{{ OPENCLAW_AGENT_SANDBOX_MODE | default('all', true) }}",
         "backend": "ssh",
         "scope": "{{ OPENCLAW_AGENT_SCOPE | default('agent', true) }}",
-        "workspaceAccess": "rw",
+        "workspaceAccess": "{{ OPENCLAW_AGENT_WORKSPACE_ACCESS | default('rw', true) }}",
         "sessionToolsVisibility": "{{ OPENCLAW_SESSION_TOOLS_VISIBILITY | default('all', true) }}",
         "ssh": {
           "target": "somebody@openclaw-sandbox:22",
@@ -48,65 +97,54 @@
       "model": {
         "primary": "{{ OPENCLAW_PRIMARY_MODEL | default('__AUTO_MODEL__', true) }}"
       },
-      "models": {
-{% if LITELLM_MASTER_KEY | default('') | length > 0 %}
-        "litellm/openrouter/anthropic/claude-opus-4": {
-          "alias": "Opus 4"
-        },
-        "litellm/openrouter/anthropic/claude-sonnet-4": {
-          "alias": "Sonnet 4"
-        },
-        "litellm/openrouter/anthropic/claude-3.5-haiku": {
-          "alias": "Haiku 3.5"
-        },
-        "litellm/openrouter/openai/gpt-4o": {
-          "alias": "GPT-4o"
-        },
-        "litellm/openrouter/google/gemini-2.5-pro-preview": {
-          "alias": "Gemini Pro"
-        },
-        "litellm/openrouter/deepseek/deepseek-r1": {
-          "alias": "DeepSeek R1"
-        },
-        "litellm/openrouter/mistralai/codestral-2501": {
-          "alias": "Codestral"
-        },
+{% if OPENCLAW_AGENT_MODELS_JSON | default('') | length > 0 %}
+      "models": {{ OPENCLAW_AGENT_MODELS_JSON }},
 {% endif %}
-        "_end": true
-      },
       "heartbeat": {
         "every": "{{ OPENCLAW_HEARTBEAT_INTERVAL | default('0s', true) }}"
       },
       "timeoutSeconds": {{ OPENCLAW_TIMEOUT_SECONDS | default('300', true) | int }},
       "maxConcurrent": {{ OPENCLAW_MAX_CONCURRENT | default('5', true) | int }},
       "subagents": {
+{% if OPENCLAW_SUBAGENT_TIMEOUT_SECONDS | default('') | length > 0 %}
+        "runTimeoutSeconds": {{ OPENCLAW_SUBAGENT_TIMEOUT_SECONDS | int }},
+{% else %}
         "runTimeoutSeconds": {{ OPENCLAW_TIMEOUT_SECONDS | default('300', true) | int }},
+{% endif %}
+{% if OPENCLAW_SUBAGENT_MAX_CONCURRENT | default('') | length > 0 %}
+        "maxConcurrent": {{ OPENCLAW_SUBAGENT_MAX_CONCURRENT | int }}
+{% else %}
         "maxConcurrent": {{ OPENCLAW_MAX_CONCURRENT | default('5', true) | int }}
+{% endif %}
       }
     }
   },
+{% endif %}
+{% if OPENCLAW_TOOLS_JSON | default('') | length > 0 %}
+  "tools": {{ OPENCLAW_TOOLS_JSON }},
+{% else %}
   "tools": {
     "fs": {
-      "workspaceOnly": true
+      "workspaceOnly": {{ OPENCLAW_TOOLS_FS_WORKSPACE_ONLY | default('true', true) }}
     },
     "sessions": {
       "visibility": "{{ OPENCLAW_SESSION_VISIBILITY | default('agent', true) }}"
     },
     "loopDetection": {
-      "enabled": true,
-      "warningThreshold": 3,
-      "criticalThreshold": 5,
-      "globalCircuitBreakerThreshold": 10
+      "enabled": {{ OPENCLAW_LOOP_DETECTION_ENABLED | default('true', true) }},
+      "warningThreshold": {{ OPENCLAW_LOOP_DETECTION_WARNING_THRESHOLD | default('3', true) | int }},
+      "criticalThreshold": {{ OPENCLAW_LOOP_DETECTION_CRITICAL_THRESHOLD | default('5', true) | int }},
+      "globalCircuitBreakerThreshold": {{ OPENCLAW_LOOP_DETECTION_GLOBAL_CIRCUIT_BREAKER_THRESHOLD | default('10', true) | int }}
     },
 {% if OPENAI_API_KEY | default('') | length > 0 %}
     "media": {
       "audio": {
-        "enabled": true,
-        "echoTranscript": true,
+        "enabled": {{ OPENCLAW_MEDIA_AUDIO_ENABLED | default('true', true) }},
+        "echoTranscript": {{ OPENCLAW_MEDIA_AUDIO_ECHO_TRANSCRIPT | default('true', true) }},
         "models": [
           {
-            "provider": "openai",
-            "model": "whisper-1"
+            "provider": "{{ OPENCLAW_MEDIA_AUDIO_PROVIDER | default('openai', true) }}",
+            "model": "{{ OPENCLAW_MEDIA_AUDIO_MODEL | default('whisper-1', true) }}"
           }
         ]
       }
@@ -114,43 +152,346 @@
 {% else %}
     "media": {
       "audio": {
-        "enabled": false
+        "enabled": {{ OPENCLAW_MEDIA_AUDIO_ENABLED | default('false', true) }}
       }
     },
 {% endif %}
     "_end": true
   },
-  "commands": {
-    "native": "auto",
-    "nativeSkills": "auto",
-    "restart": true,
-    "ownerDisplay": "raw"
+{% endif %}
+{% if OPENCLAW_BINDINGS_JSON | default('') | length > 0 %}
+  "bindings": {{ OPENCLAW_BINDINGS_JSON }},
+{% endif %}
+{% if OPENCLAW_BROADCAST_JSON | default('') | length > 0 %}
+  "broadcast": {{ OPENCLAW_BROADCAST_JSON }},
+{% endif %}
+{% if OPENCLAW_AUDIO_JSON | default('') | length > 0 %}
+  "audio": {{ OPENCLAW_AUDIO_JSON }},
+{% endif %}
+{% if OPENCLAW_MEDIA_JSON | default('') | length > 0 %}
+  "media": {{ OPENCLAW_MEDIA_JSON }},
+{% endif %}
+{% if OPENCLAW_MESSAGES_JSON | default('') | length > 0 %}
+  "messages": {{ OPENCLAW_MESSAGES_JSON }},
+{% else %}
+  "messages": {
+    "tts": {
+      "auto": "{{ OPENCLAW_TTS_AUTO | default('tagged', true) }}",
+{% if OPENCLAW_TTS_PROVIDER | default('') | length > 0 %}
+      "provider": "{{ OPENCLAW_TTS_PROVIDER }}",
+{% if OPENCLAW_TTS_MODEL_OVERRIDES_ENABLED | default('') | length > 0 %}
+      "modelOverrides": {
+        "enabled": {{ OPENCLAW_TTS_MODEL_OVERRIDES_ENABLED }}
+      },
+{% endif %}
+{% elif OPENCLAW_ELEVENLABS_API_KEY | default('') | length > 0 %}
+      "provider": "elevenlabs",
+{% else %}
+      "provider": "microsoft",
+      "modelOverrides": {
+        "enabled": {{ OPENCLAW_TTS_MODEL_OVERRIDES_ENABLED | default('true', true) }}
+      },
+{% endif %}
+      "_end": true
+    },
+    "queue": {
+      "debounceMs": {{ OPENCLAW_MESSAGES_QUEUE_DEBOUNCE_MS | default('1000', true) | int }},
+      "cap": {{ OPENCLAW_MESSAGES_QUEUE_CAP | default('20', true) | int }}
+    }
   },
+{% endif %}
+{% if OPENCLAW_COMMANDS_JSON | default('') | length > 0 %}
+  "commands": {{ OPENCLAW_COMMANDS_JSON }},
+{% else %}
+  "commands": {
+    "native": "{{ OPENCLAW_COMMANDS_NATIVE | default('auto', true) }}",
+    "nativeSkills": "{{ OPENCLAW_COMMANDS_NATIVE_SKILLS | default('auto', true) }}",
+    "restart": {{ OPENCLAW_COMMANDS_RESTART | default('true', true) }},
+    "ownerDisplay": "{{ OPENCLAW_COMMANDS_OWNER_DISPLAY | default('raw', true) }}"
+  },
+{% endif %}
+{% if OPENCLAW_APPROVALS_JSON | default('') | length > 0 %}
+  "approvals": {{ OPENCLAW_APPROVALS_JSON }},
+{% endif %}
+{% if OPENCLAW_SESSION_JSON | default('') | length > 0 %}
+  "session": {{ OPENCLAW_SESSION_JSON }},
+{% else %}
   "session": {
     "dmScope": "{{ OPENCLAW_DM_SCOPE | default('main', true) }}"
   },
+{% endif %}
+{% if OPENCLAW_CRON_JSON | default('') | length > 0 %}
+  "cron": {{ OPENCLAW_CRON_JSON }},
+{% elif OPENCLAW_CRON_ENABLED | default('') | length > 0 %}
+  "cron": {
+    "enabled": {{ OPENCLAW_CRON_ENABLED }}
+  },
+{% endif %}
+{% if OPENCLAW_HOOKS_JSON | default('') | length > 0 %}
+  "hooks": {{ OPENCLAW_HOOKS_JSON }},
+{% else %}
   "hooks": {
     "internal": {
-      "enabled": true,
+      "enabled": {{ OPENCLAW_HOOKS_INTERNAL_ENABLED | default('true', true) }},
       "entries": {
         "command-logger": {
-          "enabled": true
+          "enabled": {{ OPENCLAW_HOOKS_COMMAND_LOGGER_ENABLED | default('true', true) }}
         },
         "session-memory": {
-          "enabled": true
+          "enabled": {{ OPENCLAW_HOOKS_SESSION_MEMORY_ENABLED | default('true', true) }}
         },
         "bootstrap-extra-files": {
-          "enabled": true
+          "enabled": {{ OPENCLAW_HOOKS_BOOTSTRAP_EXTRA_FILES_ENABLED | default('true', true) }}
         },
         "boot-md": {
-          "enabled": true
+          "enabled": {{ OPENCLAW_HOOKS_BOOT_MD_ENABLED | default('true', true) }}
         }
       }
     }
   },
+{% endif %}
+{% if OPENCLAW_WEB_JSON | default('') | length > 0 %}
+  "web": {{ OPENCLAW_WEB_JSON }},
+{% endif %}
+{% if OPENCLAW_CHANNELS_JSON | default('') | length > 0 %}
+  "channels": {{ OPENCLAW_CHANNELS_JSON }},
+{% else %}
+{% if OPENCLAW_CHANNEL_DEFAULTS_JSON | default('') | length > 0 %}
+  "channels_defaults": {
+    "defaults": {{ OPENCLAW_CHANNEL_DEFAULTS_JSON }}
+  },
+{% endif %}
+{% if OPENCLAW_WHATSAPP_ENABLED | default('') | length > 0 or OPENCLAW_WHATSAPP_ALLOW_FROM_JSON | default('') | length > 0 %}
+  "channels_whatsapp": {
+    "whatsapp": {
+      "enabled": {{ OPENCLAW_WHATSAPP_ENABLED | default('true', true) }},
+      "dmPolicy": "{{ OPENCLAW_WHATSAPP_DM_POLICY | default('pairing', true) }}",
+      "allowFrom": {{ OPENCLAW_WHATSAPP_ALLOW_FROM_JSON | default('["*"]', true) }},
+      "textChunkLimit": {{ OPENCLAW_WHATSAPP_TEXT_CHUNK_LIMIT | default('4000', true) | int }},
+      "chunkMode": "{{ OPENCLAW_WHATSAPP_CHUNK_MODE | default('length', true) }}",
+      "mediaMaxMb": {{ OPENCLAW_WHATSAPP_MEDIA_MAX_MB | default('50', true) | int }},
+      "sendReadReceipts": {{ OPENCLAW_WHATSAPP_SEND_READ_RECEIPTS | default('true', true) }},
+      "groups": {{ OPENCLAW_WHATSAPP_GROUPS_JSON | default('{"*":{"requireMention":true}}', true) }},
+      "groupPolicy": "{{ OPENCLAW_WHATSAPP_GROUP_POLICY | default('allowlist', true) }}"
+    }
+  },
+{% endif %}
+{% if OPENCLAW_TELEGRAM_BOT_TOKEN | default('') | length > 0 %}
+  "channels_telegram": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "{{ OPENCLAW_TELEGRAM_DM_POLICY | default('open', true) }}",
+      "allowFrom": {{ OPENCLAW_TELEGRAM_ALLOW_FROM_JSON | default('["*"]', true) }},
+      "botToken": "${OPENCLAW_TELEGRAM_BOT_TOKEN}",
+      "groups": {{ OPENCLAW_TELEGRAM_GROUPS_JSON | default('{"*": {"requireMention": false}}', true) }},
+      "groupPolicy": "{{ OPENCLAW_TELEGRAM_GROUP_POLICY | default('allowlist', true) }}",
+      "streaming": "{{ OPENCLAW_TELEGRAM_STREAMING_MODE | default('partial', true) }}"
+    }
+  },
+{% endif %}
+{% if OPENCLAW_DISCORD_BOT_TOKEN | default('') | length > 0 %}
+  "channels_discord": {
+    "discord": {
+      "enabled": true,
+      "token": "${OPENCLAW_DISCORD_BOT_TOKEN}",
+      "dmPolicy": "{{ OPENCLAW_DISCORD_DM_POLICY | default('pairing', true) }}",
+      "allowFrom": {{ OPENCLAW_DISCORD_ALLOW_FROM_JSON | default('[]', true) }},
+      "streaming": "{{ OPENCLAW_DISCORD_STREAMING_MODE | default('partial', true) }}"
+    }
+  },
+{% endif %}
+{% if OPENCLAW_SLACK_BOT_TOKEN | default('') | length > 0 %}
+  "channels_slack": {
+    "slack": {
+      "enabled": true,
+      "botToken": "${OPENCLAW_SLACK_BOT_TOKEN}",
+{% if OPENCLAW_SLACK_APP_TOKEN | default('') | length > 0 %}
+      "appToken": "${OPENCLAW_SLACK_APP_TOKEN}",
+{% endif %}
+      "dmPolicy": "{{ OPENCLAW_SLACK_DM_POLICY | default('pairing', true) }}",
+      "allowFrom": {{ OPENCLAW_SLACK_ALLOW_FROM_JSON | default('[]', true) }},
+      "streaming": {
+        "mode": "{{ OPENCLAW_SLACK_STREAMING_MODE | default('partial', true) }}",
+        "nativeTransport": {{ OPENCLAW_SLACK_NATIVE_TRANSPORT | default('true', true) }}
+      }
+    }
+  },
+{% endif %}
+{% if OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_JSON | default('') | length > 0 or OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_FILE | default('') | length > 0 %}
+  "channels_googlechat": {
+    "googlechat": {
+      "enabled": true,
+{% if OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_JSON | default('') | length > 0 %}
+      "serviceAccount": {{ OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_JSON }},
+{% endif %}
+{% if OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_FILE | default('') | length > 0 %}
+      "serviceAccountFile": "{{ OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_FILE }}",
+{% endif %}
+      "dm": {
+        "enabled": {{ OPENCLAW_GOOGLECHAT_DM_ENABLED | default('true', true) }},
+        "policy": "{{ OPENCLAW_GOOGLECHAT_DM_POLICY | default('pairing', true) }}",
+        "allowFrom": {{ OPENCLAW_GOOGLECHAT_ALLOW_FROM_JSON | default('[]', true) }}
+      },
+      "groupPolicy": "{{ OPENCLAW_GOOGLECHAT_GROUP_POLICY | default('allowlist', true) }}"
+    }
+  },
+{% endif %}
+{% if OPENCLAW_MATTERMOST_BOT_TOKEN | default('') | length > 0 %}
+  "channels_mattermost": {
+    "mattermost": {
+      "enabled": true,
+      "botToken": "${OPENCLAW_MATTERMOST_BOT_TOKEN}",
+      "baseUrl": "{{ OPENCLAW_MATTERMOST_BASE_URL }}",
+      "dmPolicy": "{{ OPENCLAW_MATTERMOST_DM_POLICY | default('pairing', true) }}"
+    }
+  },
+{% endif %}
+{% if OPENCLAW_SIGNAL_ENABLED | default('') | length > 0 or OPENCLAW_SIGNAL_ACCOUNT | default('') | length > 0 %}
+  "channels_signal": {
+    "signal": {
+      "enabled": {{ OPENCLAW_SIGNAL_ENABLED | default('true', true) }},
+{% if OPENCLAW_SIGNAL_ACCOUNT | default('') | length > 0 %}
+      "account": "{{ OPENCLAW_SIGNAL_ACCOUNT }}",
+{% endif %}
+      "dmPolicy": "{{ OPENCLAW_SIGNAL_DM_POLICY | default('pairing', true) }}",
+      "allowFrom": {{ OPENCLAW_SIGNAL_ALLOW_FROM_JSON | default('[]', true) }}
+    }
+  },
+{% endif %}
+{% if OPENCLAW_BLUEBUBBLES_PASSWORD | default('') | length > 0 %}
+  "channels_bluebubbles": {
+    "bluebubbles": {
+      "enabled": true,
+      "dmPolicy": "{{ OPENCLAW_BLUEBUBBLES_DM_POLICY | default('pairing', true) }}",
+{% if OPENCLAW_BLUEBUBBLES_SERVER_URL | default('') | length > 0 %}
+      "serverUrl": "{{ OPENCLAW_BLUEBUBBLES_SERVER_URL }}",
+{% endif %}
+{% if OPENCLAW_BLUEBUBBLES_PASSWORD | default('') | length > 0 %}
+      "password": "${OPENCLAW_BLUEBUBBLES_PASSWORD}",
+{% endif %}
+      "_end": true
+    }
+  },
+{% endif %}
+{% if OPENCLAW_IMESSAGE_ENABLED | default('') | length > 0 %}
+  "channels_imessage": {
+    "imessage": {
+      "enabled": {{ OPENCLAW_IMESSAGE_ENABLED | default('true', true) }},
+      "dmPolicy": "{{ OPENCLAW_IMESSAGE_DM_POLICY | default('pairing', true) }}",
+      "allowFrom": {{ OPENCLAW_IMESSAGE_ALLOW_FROM_JSON | default('[]', true) }}
+    }
+  },
+{% endif %}
+{% if OPENCLAW_MATRIX_ACCESS_TOKEN | default('') | length > 0 %}
+  "channels_matrix": {
+    "matrix": {
+      "enabled": true,
+      "homeserver": "{{ OPENCLAW_MATRIX_HOMESERVER }}",
+      "accessToken": "${OPENCLAW_MATRIX_ACCESS_TOKEN}"
+    }
+  },
+{% endif %}
+{% if OPENCLAW_MSTEAMS_APP_PASSWORD | default('') | length > 0 %}
+  "channels_msteams": {
+    "msteams": {
+      "enabled": true,
+      "configWrites": {{ OPENCLAW_MSTEAMS_CONFIG_WRITES | default('true', true) }},
+{% if OPENCLAW_MSTEAMS_APP_ID | default('') | length > 0 %}
+      "appId": "${OPENCLAW_MSTEAMS_APP_ID}",
+{% endif %}
+{% if OPENCLAW_MSTEAMS_APP_PASSWORD | default('') | length > 0 %}
+      "appPassword": "${OPENCLAW_MSTEAMS_APP_PASSWORD}",
+{% endif %}
+{% if OPENCLAW_MSTEAMS_TENANT_ID | default('') | length > 0 %}
+      "tenantId": "${OPENCLAW_MSTEAMS_TENANT_ID}",
+{% endif %}
+      "_end": true
+    }
+  },
+{% endif %}
+{% if OPENCLAW_IRC_ENABLED | default('') | length > 0 %}
+  "channels_irc": {
+    "irc": {
+      "enabled": {{ OPENCLAW_IRC_ENABLED | default('true', true) }},
+      "dmPolicy": "{{ OPENCLAW_IRC_DM_POLICY | default('pairing', true) }}",
+      "configWrites": {{ OPENCLAW_IRC_CONFIG_WRITES | default('true', true) }},
+{% if OPENCLAW_IRC_HOST | default('') | length > 0 %}
+      "host": "{{ OPENCLAW_IRC_HOST }}",
+{% endif %}
+{% if OPENCLAW_IRC_PORT | default('') | length > 0 %}
+      "port": {{ OPENCLAW_IRC_PORT | int }},
+{% endif %}
+{% if OPENCLAW_IRC_TLS | default('') | length > 0 %}
+      "tls": {{ OPENCLAW_IRC_TLS }},
+{% endif %}
+      "nickserv": {
+        "enabled": {{ OPENCLAW_IRC_NICKSERV_ENABLED | default('true', true) }},
+        "service": "{{ OPENCLAW_IRC_NICKSERV_SERVICE | default('NickServ', true) }}",
+{% if OPENCLAW_IRC_NICKSERV_PASSWORD | default('') | length > 0 %}
+        "password": "${OPENCLAW_IRC_NICKSERV_PASSWORD}",
+{% endif %}
+{% if OPENCLAW_IRC_NICKSERV_REGISTER_EMAIL | default('') | length > 0 %}
+        "registerEmail": "{{ OPENCLAW_IRC_NICKSERV_REGISTER_EMAIL }}",
+{% endif %}
+        "register": {{ OPENCLAW_IRC_NICKSERV_REGISTER | default('false', true) }}
+      }
+    }
+  },
+{% endif %}
+{% if OPENCLAW_EXTRA_CHANNELS_JSON | default('') | length > 0 %}
+  "channels_extra": {{ OPENCLAW_EXTRA_CHANNELS_JSON }},
+{% endif %}
+{% endif %}
+{% if OPENCLAW_DISCOVERY_JSON | default('') | length > 0 %}
+  "discovery": {{ OPENCLAW_DISCOVERY_JSON }},
+{% endif %}
+{% if OPENCLAW_CANVAS_HOST_JSON | default('') | length > 0 %}
+  "canvasHost": {{ OPENCLAW_CANVAS_HOST_JSON }},
+{% endif %}
+{% if OPENCLAW_TALK_JSON | default('') | length > 0 %}
+  "talk": {{ OPENCLAW_TALK_JSON }},
+{% endif %}
+{% if OPENCLAW_GATEWAY_JSON | default('') | length > 0 %}
+  "gateway": {{ OPENCLAW_GATEWAY_JSON }},
+{% else %}
+  "gateway": {
+    "mode": "{{ OPENCLAW_GATEWAY_MODE | default('local', true) }}",
+    "bind": "{{ OPENCLAW_GATEWAY_BIND | default('lan', true) }}",
+    "port": {{ OPENCLAW_GATEWAY_INTERNAL_PORT | default('18789', true) | int }},
+    "auth": {
+      "mode": "{{ OPENCLAW_GATEWAY_AUTH_MODE | default('token', true) }}",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "controlUi": {
+      "enabled": {{ OPENCLAW_CONTROL_UI_ENABLED | default('true', true) }},
+      "basePath": "{{ OPENCLAW_BASE_PATH | default('') }}",
+      "dangerouslyAllowHostHeaderOriginFallback": {{ OPENCLAW_CONTROL_UI_ALLOW_HOST_HEADER_ORIGIN_FALLBACK | default('true', true) }},
+      "allowInsecureAuth": {{ OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH | default('true', true) }},
+      "dangerouslyDisableDeviceAuth": {{ OPENCLAW_CONTROL_UI_DISABLE_DEVICE_AUTH | default('true', true) }},
+{% if OPENCLAW_ALLOWED_ORIGINS_JSON | default('') | length > 0 %}
+      "allowedOrigins": {{ OPENCLAW_ALLOWED_ORIGINS_JSON }},
+{% endif %}
+      "_end": true
+    },
+    "tailscale": {
+      "mode": "{{ OPENCLAW_TAILSCALE_MODE | default('off', true) }}",
+      "resetOnExit": {{ OPENCLAW_TAILSCALE_RESET_ON_EXIT | default('false', true) }}
+    },
+    "trustedProxies": {{ OPENCLAW_TRUSTED_PROXIES_JSON | default('["10.0.0.0/8", "172.16.0.0/12"]', true) }}
+  },
+{% endif %}
+{% if OPENCLAW_MEMORY_JSON | default('') | length > 0 %}
+  "memory": {{ OPENCLAW_MEMORY_JSON }},
+{% endif %}
+{% if OPENCLAW_MCP_JSON | default('') | length > 0 %}
+  "mcp": {{ OPENCLAW_MCP_JSON }},
+{% endif %}
+{% if OPENCLAW_SKILLS_JSON | default('') | length > 0 %}
+  "skills": {{ OPENCLAW_SKILLS_JSON }},
+{% else %}
   "skills": {
     "install": {
-      "nodeManager": "npm"
+      "nodeManager": "{{ OPENCLAW_SKILLS_INSTALL_NODE_MANAGER | default('npm', true) }}"
     },
     "entries": {
 {% if OPENCLAW_NOTION_API_KEY | default('') | length > 0 %}
@@ -176,26 +517,32 @@
       "_end": true
     }
   },
+{% endif %}
+{% if OPENCLAW_PLUGINS_JSON | default('') | length > 0 %}
+  "plugins": {{ OPENCLAW_PLUGINS_JSON }},
+{% else %}
   "plugins": {
     "entries": {
 {% if OPENCLAW_BRAVE_API_KEY | default('') | length > 0 %}
       "brave": {
-        "enabled": true,
+        "enabled": {{ OPENCLAW_BRAVE_ENABLED | default('true', true) }},
         "apiKey": "${OPENCLAW_BRAVE_API_KEY}"
       },
 {% else %}
       "duckduckgo": {
-        "enabled": true
+        "enabled": {{ OPENCLAW_DUCKDUCKGO_ENABLED | default('true', true) }}
       },
 {% endif %}
 {% if OPENCLAW_GITHUB_TOKEN | default('') | length > 0 %}
       "acpx": {
-        "enabled": true,
+        "enabled": {{ OPENCLAW_ACPX_ENABLED | default('true', true) }},
         "config": {
+          "permissionMode": "approve-all",
+          "pluginToolsMcpBridge": true,
           "mcpServers": {
             "github": {
-              "command": "npx",
-              "args": ["-y", "@modelcontextprotocol/server-github"],
+              "command": "{{ OPENCLAW_ACPX_GITHUB_COMMAND | default('npx', true) }}",
+              "args": {{ OPENCLAW_ACPX_GITHUB_ARGS_JSON | default('["-y", "@modelcontextprotocol/server-github"]', true) }},
               "env": {
                 "GITHUB_PERSONAL_ACCESS_TOKEN": "${OPENCLAW_GITHUB_TOKEN}"
               }
@@ -207,88 +554,11 @@
       "_end": true
     }
   },
-{% if OPENCLAW_TELEGRAM_BOT_TOKEN | default('') | length > 0 %}
-  "channels_telegram": {
-    "telegram": {
-      "enabled": true,
-      "dmPolicy": "open",
-      "allowFrom": ["*"],
-      "botToken": "${OPENCLAW_TELEGRAM_BOT_TOKEN}",
-      "groups": {
-        "*": {
-          "requireMention": false
-        }
-      },
-      "groupPolicy": "allowlist",
-      "streaming": {"mode": "partial"}
-    }
+{% endif %}
+{% if OPENCLAW_PLUGIN_ENTRIES_JSON | default('') | length > 0 %}
+  "plugins_extra_entries": {
+    "entries": {{ OPENCLAW_PLUGIN_ENTRIES_JSON }}
   },
 {% endif %}
-{% if OPENCLAW_DISCORD_BOT_TOKEN | default('') | length > 0 %}
-  "channels_discord": {
-    "discord": {
-      "enabled": true,
-      "botToken": "${OPENCLAW_DISCORD_BOT_TOKEN}",
-      "streaming": {"mode": "partial"}
-    }
-  },
-{% endif %}
-{% if OPENCLAW_SLACK_BOT_TOKEN | default('') | length > 0 %}
-  "channels_slack": {
-    "slack": {
-      "enabled": true,
-      "botToken": "${OPENCLAW_SLACK_BOT_TOKEN}",
-      "streaming": {"mode": "partial"}
-    }
-  },
-{% endif %}
-  "messages": {
-    "tts": {
-      "auto": "tagged",
-{% if OPENCLAW_ELEVENLABS_API_KEY | default('') | length > 0 %}
-      "provider": "elevenlabs",
-{% else %}
-      "provider": "microsoft",
-      "modelOverrides": {
-        "enabled": true
-      },
-{% endif %}
-      "_end": true
-    },
-    "queue": {
-      "debounceMs": 1000,
-      "cap": 20
-    }
-  },
-  "logging": {
-    "level": "debug"
-  },
-  "gateway": {
-    "mode": "local",
-    "bind": "lan",
-    "port": 18789,
-    "auth": {
-      "mode": "token",
-      "token": "${OPENCLAW_GATEWAY_TOKEN}"
-    },
-    "controlUi": {
-      "enabled": true,
-      "basePath": "{{ OPENCLAW_BASE_PATH | default('') }}",
-      "dangerouslyAllowHostHeaderOriginFallback": true,
-      "allowInsecureAuth": true,
-      "dangerouslyDisableDeviceAuth": true,
-      "allowedOrigins": [
-        "http://swarm-01",
-        "http://swarm-01.home.arpa"
-      ]
-    },
-    "tailscale": {
-      "mode": "off",
-      "resetOnExit": false
-    },
-    "trustedProxies": [
-      "10.0.0.0/8",
-      "172.16.0.0/12"
-    ]
-  }
+  "_end": true
 }
