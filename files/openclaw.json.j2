@@ -14,7 +14,7 @@
     "providers": {
 {% if LITELLM_MASTER_KEY | default('') | length > 0 %}
       "litellm": {
-        "baseUrl": "{{ LITELLM_BASE_URL | default('http://litellm:4000') }}",
+        "baseUrl": "{{ LITELLM_BASE_URL | default('http://litellm:4000', true) }}",
         "api": "openai-completions",
         "apiKey": "${LITELLM_MASTER_KEY}",
         "models": []
@@ -35,8 +35,9 @@
       "sandbox": {
         "mode": "all",
         "backend": "ssh",
-        "scope": "agent",
+        "scope": "{{ OPENCLAW_AGENT_SCOPE | default('agent', true) }}",
         "workspaceAccess": "rw",
+        "sessionToolsVisibility": "{{ OPENCLAW_SESSION_TOOLS_VISIBILITY | default('all', true) }}",
         "ssh": {
           "target": "somebody@openclaw-sandbox:22",
           "workspaceRoot": "/home/somebody/workspaces",
@@ -45,7 +46,7 @@
         }
       },
       "model": {
-        "primary": "{{ OPENCLAW_PRIMARY_MODEL | default('__AUTO_MODEL__') }}"
+        "primary": "{{ OPENCLAW_PRIMARY_MODEL | default('__AUTO_MODEL__', true) }}"
       },
       "models": {
 {% if LITELLM_MASTER_KEY | default('') | length > 0 %}
@@ -74,19 +75,22 @@
         "_end": true
       },
       "heartbeat": {
-        "every": "{{ OPENCLAW_HEARTBEAT_INTERVAL | default('0') }}"
+        "every": "{{ OPENCLAW_HEARTBEAT_INTERVAL | default('0s', true) }}"
       },
-      "timeoutSeconds": {{ OPENCLAW_TIMEOUT_SECONDS | default('300') }},
-      "maxConcurrent": {{ OPENCLAW_MAX_CONCURRENT | default('1') }},
+      "timeoutSeconds": {{ OPENCLAW_TIMEOUT_SECONDS | default('300', true) | int }},
+      "maxConcurrent": {{ OPENCLAW_MAX_CONCURRENT | default('5', true) | int }},
       "subagents": {
-        "maxConcurrent": 1,
-        "runTimeoutSeconds": 120
+        "runTimeoutSeconds": {{ OPENCLAW_TIMEOUT_SECONDS | default('300', true) | int }},
+        "maxConcurrent": {{ OPENCLAW_MAX_CONCURRENT | default('5', true) | int }}
       }
     }
   },
   "tools": {
     "fs": {
       "workspaceOnly": true
+    },
+    "sessions": {
+      "visibility": "{{ OPENCLAW_SESSION_VISIBILITY | default('agent', true) }}"
     },
     "loopDetection": {
       "enabled": true,
@@ -123,7 +127,7 @@
     "ownerDisplay": "raw"
   },
   "session": {
-    "dmScope": "per-channel-peer"
+    "dmScope": "{{ OPENCLAW_DM_SCOPE | default('main', true) }}"
   },
   "hooks": {
     "internal": {

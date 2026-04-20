@@ -185,6 +185,10 @@ When `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the d
 | `OPENCLAW_MAX_CONCURRENT` | `1` | Maximum concurrent agents |
 | `OPENCLAW_CRON_ENABLED` | `true` | Enable cron scheduler support |
 | `OPENCLAW_BASE_PATH` | _(empty)_ | Base path for Control UI (e.g. `/openclaw` behind reverse proxy) |
+| `OPENCLAW_AGENT_SCOPE` | `agent` | Sandbox scope for agent sessions; allowed: `session`, `agent`, `shared` |
+| `OPENCLAW_DM_SCOPE` | `main` | DM scope for session routing; allowed: `main`, `per-peer`, `per-channel-peer`, `per-account-channel-peer` |
+| `OPENCLAW_SESSION_VISIBILITY` | `agent` | Session visibility for tools; allowed: `agent`, `global` |
+| `OPENCLAW_SESSION_TOOLS_VISIBILITY` | `all` | Which tools are visible in sandbox sessions; allowed: `all`, `none` |
 
 ### Configuration Features
 
@@ -264,6 +268,15 @@ The `openclaw-mcp-gateway` service ([mwaeckerlin/openclaw-mcp-gateway](https://g
 **Network isolation:** Always seggregate your networks. This is especieally important here, so that the agent in the SSH sandbox cannot sniff th etoken.
 
 **Configuration:** `OPENCLAW_GATEWAY_TOKEN` must be set (same token as the main gateway). In production, use Docker secrets. `OPENCLAW_GATEWAY_URL` defaults to `http://openclaw-gateway:18789`. Override if your setup differs. The MCP gateway ships a skill file (`SKILL.md` in the [openclaw-mcp-gateway](https://github.com/mwaeckerlin/openclaw-mcp-gateway) repository) that teaches the agent how to use the MCP tools. Upload or paste the file into a chat with your agent and instruct it to install this skill as a local OpenClaw skill in `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
+
+**Device pairing:** The MCP gateway authenticates to the OpenClaw gateway via an Ed25519 device identity. Generate the keypair with `node generate-device-pairing.mjs` (see [Development Setup](#development-setup)). This sets:
+
+| Variable | Where | Description |
+|---|---|---|
+| `OPENCLAW_DEVICE_IDENTITY` | MCP gateway | JSON-encoded private key + deviceId for the MCP gateway |
+| `OPENCLAW_DEVICE_PAIRING` | OpenClaw gateway | JSON-encoded pairing record; written verbatim to `devices/paired.json` |
+
+Both are automatically read from `.env` by Docker Compose. In production, use Docker secrets (`openclaw_device_identity`, `openclaw_device_pairing`).
 
 ## Device Pre-Seeding (Optional)
 

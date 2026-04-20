@@ -1,4 +1,6 @@
 FROM alpine/openclaw:latest
+RUN cd /tmp && npm install nunjucks
+ENV NODE_PATH=/tmp/node_modules
 RUN install -d -m 700 /home/node/.ssh
 ADD files/gateway-entrypoint.sh /entrypoint.sh
 ADD files/render-config.js /render-config.js
