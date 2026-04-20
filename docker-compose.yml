@@ -22,6 +22,9 @@ services:
       OPENCLAW_ELEVENLABS_API_KEY: ${OPENCLAW_ELEVENLABS_API_KEY}
       OPENCLAW_NOTION_API_KEY: ${OPENCLAW_NOTION_API_KEY}
       OPENCLAW_GITHUB_TOKEN: ${OPENCLAW_GITHUB_TOKEN}
+      OPENCLAW_GITEA_HOST: ${OPENCLAW_GITEA_HOST:-}
+      OPENCLAW_GITEA_TOKEN: ${OPENCLAW_GITEA_TOKEN:-}
+      OPENCLAW_GITEA_INSECURE: ${OPENCLAW_GITEA_INSECURE:-}
       OPENCLAW_TRELLO_API_KEY: ${OPENCLAW_TRELLO_API_KEY}
       OPENCLAW_TELEGRAM_BOT_TOKEN: ${OPENCLAW_TELEGRAM_BOT_TOKEN}
       OPENCLAW_DISCORD_BOT_TOKEN: ${OPENCLAW_DISCORD_BOT_TOKEN}
@@ -202,6 +205,8 @@ services:
       OPENCLAW_ACPX_ENABLED: ${OPENCLAW_ACPX_ENABLED:-}
       OPENCLAW_ACPX_GITHUB_COMMAND: ${OPENCLAW_ACPX_GITHUB_COMMAND:-}
       OPENCLAW_ACPX_GITHUB_ARGS_JSON: ${OPENCLAW_ACPX_GITHUB_ARGS_JSON:-}
+      OPENCLAW_ACPX_GITEA_COMMAND: ${OPENCLAW_ACPX_GITEA_COMMAND:-}
+      OPENCLAW_ACPX_GITEA_ARGS_JSON: ${OPENCLAW_ACPX_GITEA_ARGS_JSON:-}
     volumes:
       - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
     ports:
@@ -222,7 +227,7 @@ services:
     restart: unless-stopped
     networks:
       - gateway-sandbox
-      - gateway-mcp
+      - gateway-mcp-gateway
 
   openclaw-sandbox:
     image: mwaeckerlin/openclaw:sandbox
@@ -251,7 +256,7 @@ services:
     networks:
       - gateway-sandbox
       - sandbox-dind
-      - sandbox-mcp
+      - sandbox-mcp-gateway
 
   openclaw-dind:
     image: docker:dind
@@ -283,8 +288,8 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - gateway-mcp
-      - sandbox-mcp
+      - gateway-mcp-gateway
+      - sandbox-mcp-gateway
 
   allow-write-access:
     image: mwaeckerlin/allow-write-access
@@ -296,8 +301,8 @@ services:
 networks:
   gateway-sandbox:
   sandbox-dind:
-  gateway-mcp:
-  sandbox-mcp:
+  gateway-mcp-gateway:
+  sandbox-mcp-gateway:
 
 volumes:
   openclaw-config:
