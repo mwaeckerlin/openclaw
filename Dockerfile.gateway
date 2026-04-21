@@ -1,9 +1,15 @@
+ARG OPENCLAW_MCP_GATEWAY_IMAGE="mwaeckerlin/openclaw-mcp-gateway"
+FROM ${OPENCLAW_MCP_GATEWAY_IMAGE} AS mcp_gateway_skills
+
 FROM alpine/openclaw:latest
 RUN cd /tmp && npm install nunjucks
 ENV NODE_PATH=/tmp/node_modules
 RUN install -d -m 700 /home/node/.ssh
+RUN install -d -m 755 /app/skills/ssh-sandbox /app/skills/openclaw-mcp-gateway
 ADD files/gateway-entrypoint.sh /entrypoint.sh
 ADD files/render-config.js /render-config.js
 ADD files/openclaw.json.j2 /openclaw.json.j2.default
+ADD files/SKILL.md /app/skills/ssh-sandbox/SKILL.md
+COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway/SKILL.md /app/skills/openclaw-mcp-gateway/SKILL.md
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789"]

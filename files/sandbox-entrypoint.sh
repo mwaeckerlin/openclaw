@@ -7,6 +7,15 @@ if [ -z "$key" ]; then
 fi
 [ -d ${RUN_HOME}/.ssh ] || mkdir -p ${RUN_HOME}/.ssh
 echo "$key" > ${RUN_HOME}/.ssh/authorized_keys
+echo "==== Installing Skills to Existing Workspaces ===="
+for workspace_skills in "${RUN_HOME}"/workspaces/*/skills; do
+  [ -d "$workspace_skills" ] || continue
+  for source_file in /opt/openclaw/skills/*/SKILL.md; do
+    [ -f "$source_file" ] || continue
+    skill_name="$(basename "$(dirname "$source_file")")"
+    install -D -m 644 -o "${RUN_USER}" -g "${RUN_GROUP}" "$source_file" "${workspace_skills}/${skill_name}/SKILL.md"
+  done
+done
 if [ -n "${DOCKER_HOST}" ]; then
   echo "==== Enabling Docker Host ===="
   echo "DOCKER_HOST=${DOCKER_HOST}" >> /etc/environment

@@ -4,6 +4,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.gateway
+      args:
+        OPENCLAW_MCP_GATEWAY_IMAGE: ${OPENCLAW_MCP_GATEWAY_IMAGE:-mwaeckerlin/openclaw-mcp-gateway}
     depends_on:
       openclaw-sandbox:
         condition: service_healthy
@@ -234,6 +236,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.sandbox
+      args:
+        OPENCLAW_MCP_GATEWAY_IMAGE: ${OPENCLAW_MCP_GATEWAY_IMAGE:-mwaeckerlin/openclaw-mcp-gateway}
     environment:
       OPENCLAW_SANDBOX_SSH_PUBLIC_KEY: ${OPENCLAW_SANDBOX_SSH_PUBLIC_KEY}
       DOCKER_HOST: tcp://openclaw-dind:2375
@@ -276,7 +280,7 @@ services:
       - sandbox-dind
 
   openclaw-mcp-gateway:
-    image: mwaeckerlin/openclaw-mcp-gateway
+    image: ${OPENCLAW_MCP_GATEWAY_IMAGE:-mwaeckerlin/openclaw-mcp-gateway}
     depends_on:
       openclaw-gateway:
         condition: service_healthy

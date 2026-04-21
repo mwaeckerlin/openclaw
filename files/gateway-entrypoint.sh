@@ -108,6 +108,7 @@ if [ -n "$OPENAI_API_KEY" ] && [ -z "$OPENCLAW_OPENAI_MODELS_JSON" ]; then
     const fs = require('fs');
     const cfgPath = process.argv[1];
     const providerId = process.argv[2];
+    const syncDiscoveredToAgentList = process.argv[3] === 'true';
     const raw = fs.readFileSync(0, 'utf8');
     if (!raw || !raw.trim()) process.exit(2);
     const data = JSON.parse(raw);
@@ -122,11 +123,41 @@ if [ -n "$OPENAI_API_KEY" ] && [ -z "$OPENCLAW_OPENAI_MODELS_JSON" ]; then
       cfg.models.providers[providerId] = {};
     }
     cfg.models.providers[providerId].models = models;
+    if (syncDiscoveredToAgentList) {
+      if (!cfg.agents || typeof cfg.agents !== 'object') cfg.agents = {};
+      if (!cfg.agents.defaults || typeof cfg.agents.defaults !== 'object') cfg.agents.defaults = {};
+      cfg.agents.defaults.models = Object.fromEntries(
+        models.map((m) => [providerId + '/' + m.id, {}]),
+      );
+    }
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
     process.stdout.write(String(models.length));
-  " "$HOME/.openclaw/openclaw.json" "openai"); then
+  " "$HOME/.openclaw/openclaw.json" "openai" "$([ -z "${OPENCLAW_AGENT_MODELS_JSON:-}" ] && [ -z "${OPENCLAW_AGENTS_JSON:-}" ] && echo true || echo false)"); then
     echo "  Discovered $model_count models from OpenAI"
     echo "Models injected into config"
+    echo "  OpenAI discovered model IDs: $(node -e "
+      const fs = require('fs');
+      const cfg = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+      const models = (((cfg || {}).models || {}).providers || {}).openai?.models || [];
+      const ids = [];
+      for (const model of models) {
+        if (typeof model === 'string') {
+          ids.push(model);
+          continue;
+        }
+        if (model && typeof model.id === 'string') ids.push(model.id);
+      }
+      process.stdout.write(ids.join(', '));
+    " "$HOME/.openclaw/openclaw.json")"
+    if [ -z "${OPENCLAW_AGENT_MODELS_JSON:-}" ] && [ -z "${OPENCLAW_AGENTS_JSON:-}" ]; then
+      agent_model_count=$(node -e "
+        const fs = require('fs');
+        const cfg = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+        const models = ((((cfg || {}).agents || {}).defaults || {}).models);
+        process.stdout.write(String(models && typeof models === 'object' ? Object.keys(models).length : 0));
+      " "$HOME/.openclaw/openclaw.json")
+      echo "  Agent model options synchronized from OpenAI provider list ($agent_model_count entries)"
+    fi
   else
     echo "WARN: Could not discover OpenAI models from $_openai_url (continuing with configured/default list)" >&2
   fi

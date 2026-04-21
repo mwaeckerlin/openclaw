@@ -285,7 +285,9 @@
       "botToken": "${OPENCLAW_TELEGRAM_BOT_TOKEN}",
       "groups": {{ OPENCLAW_TELEGRAM_GROUPS_JSON | default('{"*": {"requireMention": false}}', true) }},
       "groupPolicy": "{{ OPENCLAW_TELEGRAM_GROUP_POLICY | default('allowlist', true) }}",
-      "streaming": "{{ OPENCLAW_TELEGRAM_STREAMING_MODE | default('partial', true) }}"
+      "streaming": {
+        "mode": "{{ OPENCLAW_TELEGRAM_STREAMING_MODE | default('partial', true) }}"
+      }
     }
   },
 {% endif %}
@@ -296,7 +298,9 @@
       "token": "${OPENCLAW_DISCORD_BOT_TOKEN}",
       "dmPolicy": "{{ OPENCLAW_DISCORD_DM_POLICY | default('pairing', true) }}",
       "allowFrom": {{ OPENCLAW_DISCORD_ALLOW_FROM_JSON | default('[]', true) }},
-      "streaming": "{{ OPENCLAW_DISCORD_STREAMING_MODE | default('partial', true) }}"
+      "streaming": {
+        "mode": "{{ OPENCLAW_DISCORD_STREAMING_MODE | default('partial', true) }}"
+      }
     }
   },
 {% endif %}
@@ -526,7 +530,11 @@
 {% if OPENCLAW_BRAVE_API_KEY | default('') | length > 0 %}
       "brave": {
         "enabled": {{ OPENCLAW_BRAVE_ENABLED | default('true', true) }},
-        "apiKey": "${OPENCLAW_BRAVE_API_KEY}"
+        "config": {
+          "webSearch": {
+            "apiKey": "${OPENCLAW_BRAVE_API_KEY}"
+          }
+        }
       },
 {% else %}
       "duckduckgo": {

@@ -501,7 +501,7 @@ The `openclaw-mcp-gateway` service ([mwaeckerlin/openclaw-mcp-gateway](https://g
 
 **Network isolation:** Always seggregate your networks. This is especieally important here, so that the agent in the SSH sandbox cannot sniff th etoken.
 
-**Configuration:** `OPENCLAW_GATEWAY_TOKEN` must be set (same token as the main gateway). In production, use Docker secrets. `OPENCLAW_GATEWAY_URL` defaults to `http://openclaw-gateway:18789`. Override if your setup differs. The MCP gateway ships a skill file (`SKILL.md` in the [openclaw-mcp-gateway](https://github.com/mwaeckerlin/openclaw-mcp-gateway) repository) that teaches the agent how to use the MCP tools. Upload or paste the file into a chat with your agent and instruct it to install this skill as a local OpenClaw skill in `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
+**Configuration:** `OPENCLAW_GATEWAY_TOKEN` must be set (same token as the main gateway). In production, use Docker secrets. `OPENCLAW_GATEWAY_URL` defaults to `http://openclaw-gateway:18789`. Override if your setup differs. `OPENCLAW_MCP_GATEWAY_IMAGE` selects the MCP gateway image and is used as skill source while building gateway and sandbox images. This image must provide `/app/skills/openclaw-mcp-gateway/SKILL.md`. Gateway skills are packaged under `/app/skills`. Sandbox skills are packaged under `/opt/openclaw/skills`; on sandbox startup they are copied into every existing `~/workspaces/*/skills/<skill-name>/SKILL.md`.
 
 **Device pairing:** The MCP gateway authenticates to the OpenClaw gateway via an Ed25519 device identity. Generate the keypair with `node generate-device-pairing.mjs` (see [Development Setup](#development-setup)). This sets:
 
