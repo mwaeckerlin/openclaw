@@ -13,7 +13,8 @@ Combine OpenClaw with Security and Easiness! Run out of the box a secure docker 
 
 ![](doc/overview.svg)
 
-<div hidden>
+<details>
+<summary>PlantUML source</summary>
 
 ```plantuml
 @startuml overview
@@ -31,7 +32,7 @@ cloud Docker {
 @enduml
 ```
 
-</div>
+</details>
 
 ## Security Model
 
@@ -75,7 +76,8 @@ Acceptable in a controlled internal Docker network where DNS is managed by Docke
 
 ![](doc/architecture.svg)
 
-<div hidden>
+<details>
+<summary>PlantUML source</summary>
 
 ```plantuml
 @startuml architecture
@@ -123,7 +125,7 @@ aw .up.> cfg : chown
 @enduml
 ```
 
-</div>
+</details>
 
 ## Local Development Setup
 
