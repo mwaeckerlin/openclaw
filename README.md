@@ -4,7 +4,7 @@
 Combine OpenClaw with Security and Easiness! Run out of the box a secure docker based sandboxed OpenClaw, locally or in a cloud.
 
 **It has never been so easy to run a *secure* sandboxed pre-configured OpenClaw!**:
-1. get an [OpenAI token](https://platform.openai.com/api-keys) (or use )
+1. get an [OpenAI token](https://platform.openai.com/api-keys) (or use [LiteLLM](https://docs.litellm.ai/docs/))
 1. write some [configuration variables in `.env`](#development-setup)
 2. run `npm start`
 3. open: [`http://localhost:18789/`](http://localhost:18789/)
@@ -77,14 +77,16 @@ Acceptable in a controlled internal Docker network where DNS is managed by Docke
 
 <details>
 <summary>PlantUML source</summary>
+
 ```plantuml
+
 @startuml architecture
 actor User as user
 
 cloud docker {
 
   node "mwaeckerlin/openclaw:gateway" as gw {
-    [Control Plane\nLLM Proxy\nWeb UI] as ctrl
+    [Gateway] as ctrl
     storage "openclaw-config" as cfg
     ctrl - cfg
   }
@@ -94,32 +96,32 @@ cloud docker {
   }
 
   node "mwaeckerlin/openclaw:sandbox" as sb {
-    [sshd :22\nlogin: somebody] as sshd
+    [Sandbox] as sshd
     storage "openclaw-workspace" as ws
-    sshd -left- ws
+    sshd -right- ws
   }
 
   node "openclaw-dind" as dind {
-    [Docker Daemon] as dd
+    [Docker] as dd
     storage "openclaw-docker" as dv
     dd -left- dv
   }
 
   node "mwaeckerlin/mcp-github" {
-    [MCP Github Server] as gh
+    [Github-Gateway] as gh
   }
 
   component "allow-write-access" as aw
 }
 
-user --> ctrl : "HTTP :18789"
+user --> ctrl : "HTTP"
 ctrl --> sshd : "SSH"
-sshd --up--> mcp : openclaw cli commands
-mcp --up--> ctrl : forward cli command
+sshd --up--> mcp : openclaw\ncommands
+mcp --up--> ctrl : forward\ncommands
+sshd -left-> dd : docker
+aw .up.> cfg : chown
 sshd --> gh
 gh ----> [GitHib]
-sshd -down-> dd : docker
-aw .up.> cfg : chown
 @enduml
 ```
 
@@ -231,7 +233,7 @@ This means *any* Docker Secret is automatically available as an environment vari
 | `OPENCLAW_BLUEBUBBLES_PASSWORD` | — | BlueBubbles password |
 | `OPENCLAW_IRC_NICKSERV_PASSWORD` | — | IRC NickServ password |
 
-### LiteLLM Configuration (Optional)
+### LiteLLM Configuration
 
 When `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the default model switches to `litellm/openrouter/anthropic/claude-sonnet-4`. Without it, OpenAI is used directly with `openai/gpt-4o` as default.
 
