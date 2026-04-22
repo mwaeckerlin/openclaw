@@ -176,18 +176,19 @@ Control UI: `http://localhost:18789/`
 
 ## Full Configuration Guide
 
-### Automatic Secret-to-Environment Mapping
+### Automatic Secret Mapping
 
 The gateway entrypoint iterates over all files in `/run/secrets/` and exports each as an environment variable. The filename is uppercased and dashes are replaced by underscores, e.g.:
 
-| Secret file | Environment variable |
-|---|---|
-| `/run/secrets/openai_api_key` | `OPENAI_API_KEY` |
-| `/run/secrets/openclaw_sandbox_ssh_private_key` | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` |
+| Environment Variable | Secret Name | Alternative Secret Name |
+|---|---|---|
+| `OPENAI_API_KEY` | `openai_api_key` | `openai-api-key` |
+| `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` | `openclaw_sandbox_ssh_private_key` | `openclaw-sandbox-ssh-private-key` |
+| … | … | … |
 
-The sandbox reads its public key directly from `/run/secrets/openclaw_sandbox_ssh_public_key` (fallback when `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` is not set).
+The sandbox reads its public key directly from `/run/secrets/openai_api_key  or alternatively `/run/secrets/openai-api-key` (fallback when `OPENAI_API_KEY` is not set,`-` and `_` are interchangable).
 
-This means any Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables.
+This means *any* Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables.
 
 ### Core Configuration
 
@@ -199,6 +200,8 @@ This means any Docker Secret is automatically available as an environment variab
 
 ### Feature Configuration
 
+| Variable | Required | Description |
+|---|---|---|
 | `OPENAI_API_KEY` | no | OpenAI API key; enables OpenAI provider, Whisper audio transcription, and is used as default model provider if `LITELLM_MASTER_KEY` is not set |
 | `OPENCLAW_WHISPER_API_KEY` | no | Whisper API key override; if unset and `OPENAI_API_KEY` is set, it is derived from `OPENAI_API_KEY` |
 | `OVERWRITE_CONFIG` | no | If set, overwrite `openclaw.json` with the baked-in default on every start |
@@ -266,19 +269,13 @@ When configured, model lists are discovered dynamically from providers:
 |---|---|---|
 | `OPENCLAW_PLUGINS_JSON` | — | Full `plugins` section as JSON |
 | `OPENCLAW_PLUGIN_ENTRIES_JSON` | — | Additional `plugins.entries` object merged into the generated config |
-| `OPENCLAW_PLUGIN_SPECS_JSON` | — | Map `{ "<pluginId>": "<install-spec>" }` for plugin auto-install resolution |
-| `OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED` | `true` | Auto-install plugin specs referenced in `plugins.entries` when not installed |
-| `OPENCLAW_PLUGIN_AUTO_INSTALL_STRICT` | `false` | Fail startup when a plugin install fails |
-| `OPENCLAW_PLUGIN_AUTO_INSTALL_PREFIX` | `@openclaw/` | Default prefix used when no explicit spec is provided |
-| `OPENCLAW_PLUGIN_AUTO_INSTALL_SKIP_JSON` | `["acpx","brave","duckduckgo"]` | Plugin ID list excluded from auto-install |
 | `PLUGINS` | — | Manual install spec passed to `openclaw plugins install` |
 
 Example:
 
 ```bash
 OPENCLAW_PLUGIN_ENTRIES_JSON='{"matrix":{"enabled":true,"config":{"homeserver":"https://matrix.example","accessToken":"${OPENCLAW_MATRIX_ACCESS_TOKEN}"}}}'
-OPENCLAW_PLUGIN_SPECS_JSON='{"matrix":"@openclaw/matrix"}'
-OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED=true
+PLUGINS='@openclaw/matrix'
 ```
 
 ### Full OpenClaw Config Coverage (Schema Roots)

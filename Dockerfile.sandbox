@@ -81,6 +81,8 @@ ADD files/SKILL.md /opt/openclaw/skills/ssh-sandbox/SKILL.md
 COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway/SKILL.md /opt/openclaw/skills/openclaw-mcp-gateway/SKILL.md
 ADD files/sandbox-entrypoint.sh /entrypoint.sh
 EXPOSE 22
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=60 \
+  CMD pgrep -x sshd >/dev/null || exit 1
 ENTRYPOINT ["/entrypoint.sh"]
 
 FROM build
