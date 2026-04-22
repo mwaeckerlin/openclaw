@@ -1,38 +1,127 @@
-# OpenClaw — Gateway + SSH Sandbox
+# Simple Secure OpenClaw in SSH Sandbox
 
-Run OpenClaw in a Docker-based sandboxed setup, locally or in cloud environments.
 
-Set configuration variables in `.env`, run `npm start`, and access the instance at `http://localhost:18789/`.
+Combine OpenClaw with Security and Easiness! Run out of the box a secure docker based sandboxed OpenClaw, locally or in a cloud.
 
-For a simple `.env` setup, see [Development Setup](#development-setup) below.
+**It has never been so easy to run a *secure* sandboxed pre-configured OpenClaw!**:
+1. get an [OpenAI token](https://platform.openai.com/api-keys) (or use )
+1. write some [configuration variables in `.env`](#development-setup)
+2. run `npm start`
+3. open: [`http://localhost:18789/`](http://localhost:18789/)
+
+**Target audience:** Security aware **developer** with some basic docker know how. Everybody else: **Keep your hands away from OpenClaw!**
+
+![](doc/overview.svg)
+<div hidden>
+@startuml overview
+cloud Docker {
+  component [Openclaw:Gateway] {
+    (secrets) . [Gateway]
+  }
+  component [Openclaw:Sandbox] {
+    [Ubuntu]
+  }
+}
+:User: --> [Gateway] : control
+:Agent: --> [Ubuntu] : execute\ncommands
+[Gateway] -> [Ubuntu] : ssh
+@enduml
+</div>
 
 ## Security Model
 
 The primary security mechanism is **strict isolation**: The AI runs in a dedicated sandbox container that contains only its tools and workspace — no host secrets, no production data, no unrelated resources.
 
-All further measures reinforce this model:
+### Seggregation in Container
 
-- **Workspace restriction** (`tools.fs.workspaceOnly: true`) — File tools limited to the sandbox workspace
-- **Loop detection** (`loopDetection`) — Circuit breaker against tool/agent loops (threshold: 10)
-- **No port over-exposure** — Only port 18789 (UI/API) is published; internal ports stay internal
+- **Isolation in Seggregated Container** — The gateway controlls access and secrets. The agent has no direct access to the gateway (no tokens, no secrets). The agent cannot access files or variables or secrets defined on the gateway. *Never expose any secret to the sandbox!*
+- **Access through MCP** — Where the SSH sandboxed agent cannot get access from the gateway, we add an MCP server that holds the token in a seggregated container.
 - **Container hardening** — `no-new-privileges`, `pids_limit: 256` against escalation and fork bombs
-- **Network isolation** — Containers communicate on an internal Docker network only
-- **Docker-in-Docker isolation** — Sandbox uses a dedicated Docker daemon (`docker:dind`), no access to host Docker
-- **Secrets + encrypted networks for production** — Docker Secrets instead of ENV, encrypted overlay in Swarm
 
-### What `workspaceOnly` Does NOT Protect
+### Network Isolation
 
-The `workspaceOnly` setting restricts OpenClaw's **file tools** to the workspace. However, `exec`/shell commands can still read container system files (e.g. `/etc/passwd`, `/proc`). This is acceptable because the sandbox is an isolated container — there are no host secrets inside it.
+- **Network isolation** — Containers communicate on seggregated internal networks. Every two containers have their own network.
+- **Network Encryption** (production) — When going to production, *encrypt the networks* (e.g. encrypted overlay in docker swarm: for all networks set `networks.<network>.driver_opts.encrypted: "true"`, or add a service mesh)
+- **No port over-exposure** — Only port 18789 (UI/API) is published for *local testing only*; internal ports stay internal. If you attach chat tool, such as [Telegram](https://telegram.org/), you can even close that port. You can then reach your OpenClaw through Telegram. *Do not expose 18789 to the Internet without further protection.* You may add e.g. [Traefik](https://doc.traefik.io/traefik/) service and an [Authentik proxy-provider outpost](https://docs.goauthentik.io/add-secure-apps/outposts) in front of OpenClaw when you want to access it through the internet.
+
+**Note:** If networks are neither seggregated nor encrypted, the agent can *sniff for secrets* on the shared or unencrypted network. So network isolation is crucial, and encryption is highly recommended at least in production.
+
+### Secrets
+
+- **Secrets** (production) — Use docker secrets instead of environment variables in docker swarm (or use a vault such as Hashicorps to deploy in e.g. Kubernetes). Secrets can be mounted on `/var/secrets/secret-name` and are then exported to the OpenClaw environment variables as `SECRET_NAME`.
+
+### Additional Tools and Seggregations
+
+- **Docker-in-Docker isolation** — If yo uwant to allow the agent to run docker commands, you may attach a dedicated Docker container (`docker:dind`) where the agent can run docker in an isolated installation, seggregated from your docker installation. Be aware that the agent can gain root, but only in tis isolated container. Just restart the container to restore in case of a break out. No data is in danger.
+- **OpenClaw-MCP-Gateway** — The project [mwaeckerlin/openclaw-mcp-gateway](https://github.com/mwaeckerlin/openclaw-mcp-gateway) runs an MCP server to give the sandbox limited access to the gateway to execute some safe `openclaw` CLI commands. It helps for self analysis and allows to setup cron jobs. Only the MCP server holds the gateway token, the sandbox has no access to the token.
+- **MCP-Github** — The project [mwaeckerlin/mcp-github](https://github.com/mwaeckerlin/mcp-github) gives the sandbox access to the GitHub API. Only the MCP server holds the GitHub token, the sandbox has no access to the token.
+
+### Hardened OpenClaw Setup
+
+- **Workspace restriction** (`tools.fs.workspaceOnly: true`) — File tools limited to the sandbox workspace.  
+  **Note:** The `workspaceOnly` setting restricts OpenClaw's **file tools** to the workspace. However, `exec`/shell commands can still read container system files (e.g. `/etc/passwd`, `/proc`). This is acceptable because the sandbox is an isolated container — there are no host secrets inside it.
+- **Loop detection** (`loopDetection`) — Circuit breaker against tool/agent loops. That's more to prevent token over spending.
 
 ### `strictHostKeyChecking: false`
 
 Acceptable in a controlled internal Docker network where DNS is managed by Docker. For production hardening, consider pinning host keys.
 
-## Development Setup
+## Full Architecture
+
+![](doc/architecture.svg)
+<div hidden>
+@startuml architecture
+actor User as user
+
+cloud docker {
+
+  node "mwaeckerlin/openclaw:gateway" as gw {
+    [Control Plane\nLLM Proxy\nWeb UI] as ctrl
+    storage "openclaw-config" as cfg
+    ctrl - cfg
+  }
+
+  node "mwaeckerlin/openclaw-mcp-gateway" {
+    [MCP OpenClaw Server] as mcp
+  }
+
+  node "mwaeckerlin/openclaw:sandbox" as sb {
+    [sshd :22\nlogin: somebody] as sshd
+    storage "openclaw-workspace" as ws
+    sshd -left- ws
+  }
+
+  node "openclaw-dind" as dind {
+    [Docker Daemon] as dd
+    storage "openclaw-docker" as dv
+    dd -left- dv
+  }
+
+  node "mwaeckerlin/mcp-github" {
+    [MCP Github Server] as gh
+  }
+
+  component "allow-write-access" as aw
+}
+
+user --> ctrl : "HTTP :18789"
+ctrl --> sshd : "SSH"
+sshd --up--> mcp : openclaw cli commands
+mcp --up--> ctrl : forward cli command
+sshd --> gh
+gh ----> [GitHib]
+sshd -down-> dd : docker
+aw .up.> cfg : chown
+@enduml
+</div>
+
+## Local Development Setup
 
 For local testing with `docker compose` and `.env` file.
 
 ### 1. Generate SSH Keypair and .env
+
+Simplest use is with an [OpenAI token](https://platform.openai.com/api-keys) that you store in `OPENAI_API_KEY`. All other secrets can just be randomly generated:
 
 ```bash
 ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
@@ -40,12 +129,10 @@ cat > .env <<EOF
 OPENCLAW_GATEWAY_TOKEN=$(pwgen 40 1)
 OPENCLAW_SANDBOX_SSH_PUBLIC_KEY=$(cat openclaw-key.pub)
 OPENCLAW_SANDBOX_SSH_PRIVATE_KEY=$(sed -z 's/\n/\\n/g' openclaw-key)
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=sk-...[PLACE-TOKEN-HERE]
 EOF
-rm openclaw-key.pub
+rm openclaw-key openclaw-key.pub
 ```
-
-Set `OPENAI_API_KEY` to your OpenAI API key from https://platform.openai.com/api-keys.
 
 ### 2. Generate MCP Gateway Device Pairing
 
@@ -75,50 +162,11 @@ Control UI: `http://localhost:18789/`
 
 **This is for local / trusted-network use only.** The gateway token is transmitted unencrypted. Do not expose port 18789 to the internet without a TLS reverse proxy.
 
-## Production Setup (Docker Swarm)
-
-For production, use **Docker Secrets** and **encrypted overlay networks**.
-
-### 1. Create Secrets
-
-```bash
-ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
-pwgen 40 1 | docker secret create openclaw_gateway_token -
-docker secret create openclaw_sandbox_ssh_private_key openclaw-key
-docker secret create openclaw_sandbox_ssh_public_key openclaw-key.pub
-echo "sk-..." | docker secret create openai_api_key -
-rm openclaw-key openclaw-key.pub
-```
-
-### 2. Encrypted Network
-
-```bash
-docker network create --driver overlay --opt encrypted openclaw
-```
-
-This enables IPsec encryption for all traffic between swarm nodes.
-
-### 3. Deploy
-
-Use `docker stack deploy` with a production compose file that references secrets:
-
-```yaml
-secrets:
-  openclaw_gateway_token:
-    external: true
-  openclaw_sandbox_ssh_private_key:
-    external: true
-  openclaw_sandbox_ssh_public_key:
-    external: true
-  openai_api_key:
-    external: true
-```
-
-Entrypoints automatically read from `/run/secrets/` when environment variables are empty.
+## Full Configuration Guide
 
 ### Automatic Secret-to-Environment Mapping
 
-The gateway entrypoint iterates over all files in `/run/secrets/` and exports each as an environment variable. The filename is uppercased and dashes are replaced by underscores:
+The gateway entrypoint iterates over all files in `/run/secrets/` and exports each as an environment variable. The filename is uppercased and dashes are replaced by underscores, e.g.:
 
 | Secret file | Environment variable |
 |---|---|
@@ -127,18 +175,7 @@ The gateway entrypoint iterates over all files in `/run/secrets/` and exports ea
 
 The sandbox reads its public key directly from `/run/secrets/openclaw_sandbox_ssh_public_key` (fallback when `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` is not set).
 
-This means any Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables set via `environment:` in Compose.
-
-### Production Checklist
-
-- [ ] All secrets via `docker secret`, not environment variables
-- [ ] Encrypted overlay network (`--opt encrypted`)
-- [ ] Port 18789 behind TLS reverse proxy (nginx, Traefik, Kong)
-- [ ] Port 18790 not exposed (internal bridge only)
-- [ ] Firewall restricts access to gateway port
-- [ ] Consider `read_only: true` + `tmpfs` mounts if OpenClaw supports it
-
-## Environment Variables
+This means any Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables.
 
 ### Core Configuration
 
@@ -147,17 +184,15 @@ This means any Docker Secret is automatically available as an environment variab
 | `OPENCLAW_GATEWAY_TOKEN` | yes | Shared secret for Control UI |
 | `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` | yes | SSH public key (ed25519) for sandbox access |
 | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` | yes | SSH private key, `\n`-encoded (gateway → sandbox) |
+
+### Feature Configuration
+
 | `OPENAI_API_KEY` | no | OpenAI API key; enables OpenAI provider, Whisper audio transcription, and is used as default model provider if `LITELLM_MASTER_KEY` is not set |
 | `OPENCLAW_WHISPER_API_KEY` | no | Whisper API key override; if unset and `OPENAI_API_KEY` is set, it is derived from `OPENAI_API_KEY` |
 | `OVERWRITE_CONFIG` | no | If set, overwrite `openclaw.json` with the baked-in default on every start |
 | `OPENCLAW_CONFIG_DIR` | no | Host path for config (default: Docker volume) |
 | `OPENCLAW_STATE_DIR` | no | OpenClaw state directory path inside the gateway container (defaults to `~/.openclaw`) |
 | `OPENCLAW_GATEWAY_PORT` | no | Gateway port (default: 18789) |
-
-### Optional Feature Enablement (via API Keys)
-
-| Variable | Default | Description |
-|---|---|---|
 | `OPENCLAW_ELEVENLABS_API_KEY` | — | ElevenLabs API key; enables TTS via ElevenLabs (else Microsoft TTS) |
 | `OPENCLAW_NOTION_API_KEY` | — | Notion API key; enables Notion skill |
 | `OPENCLAW_GITHUB_TOKEN` | — | GitHub personal access token; enables GitHub MCP server via ACPX (token stays gateway-side, sandbox only sees MCP tools) |
@@ -260,285 +295,32 @@ Plugin configurations are supported in two modes:
 
 ### Individual Overrides (Per-Parameter)
 
-Neben den Block-Overrides sind die meisten sinnvollen Einzelwerte direkt per ENV überschreibbar (ohne die SSH-Sandbox-Zielstruktur aufzuweichen).
+In addition to section-level JSON overrides, common single settings can be overridden directly via environment variables.
 
-Wichtige Gruppen:
+Most useful groups:
 
-- Models/Provider: `OPENCLAW_MODELS_MODE`, `OPENCLAW_LITELLM_API`, `OPENCLAW_LITELLM_MODELS_JSON`, `OPENCLAW_OPENAI_BASE_URL`, `OPENCLAW_OPENAI_MODELS_JSON`, `OPENCLAW_AGENT_MODELS_JSON`
-- Agent runtime: `OPENCLAW_AGENT_SANDBOX_MODE`, `OPENCLAW_AGENT_WORKSPACE_ACCESS`, `OPENCLAW_SUBAGENT_TIMEOUT_SECONDS`, `OPENCLAW_SUBAGENT_MAX_CONCURRENT`
-- Tools/media: `OPENCLAW_TOOLS_FS_WORKSPACE_ONLY`, `OPENCLAW_LOOP_DETECTION_*`, `OPENCLAW_MEDIA_AUDIO_*`
-- Messages/commands/hooks: `OPENCLAW_TTS_*`, `OPENCLAW_MESSAGES_QUEUE_*`, `OPENCLAW_COMMANDS_*`, `OPENCLAW_HOOKS_*`
-- Channels: `OPENCLAW_TELEGRAM_*`, `OPENCLAW_DISCORD_*`, `OPENCLAW_SLACK_*`
-- Gateway: `OPENCLAW_GATEWAY_MODE`, `OPENCLAW_GATEWAY_BIND`, `OPENCLAW_GATEWAY_INTERNAL_PORT`, `OPENCLAW_GATEWAY_AUTH_MODE`, `OPENCLAW_CONTROL_UI_*`, `OPENCLAW_TAILSCALE_*`, `OPENCLAW_TRUSTED_PROXIES_JSON`
-- ACPX/MCP: `OPENCLAW_ACPX_*`, `OPENCLAW_GITHUB_TOKEN`, `OPENCLAW_GITEA_HOST`, `OPENCLAW_GITEA_TOKEN`, `OPENCLAW_GITEA_INSECURE`
-- Sandbox bridge env: `OPENCLAW_MCP_GATEWAY_URL`
+- Models and providers: `OPENCLAW_MODELS_MODE`, `OPENCLAW_OPENAI_BASE_URL`, `OPENCLAW_OPENAI_MODELS_JSON`, `OPENCLAW_LITELLM_*`, `OPENCLAW_AGENT_MODELS_JSON`
+- Agent runtime: `OPENCLAW_AGENT_SANDBOX_MODE`, `OPENCLAW_AGENT_WORKSPACE_ACCESS`, `OPENCLAW_SUBAGENT_*`
+- Tools and media: `OPENCLAW_TOOLS_FS_WORKSPACE_ONLY`, `OPENCLAW_LOOP_DETECTION_*`, `OPENCLAW_MEDIA_AUDIO_*`, `OPENCLAW_TTS_*`
+- Messaging and hooks: `OPENCLAW_MESSAGES_QUEUE_*`, `OPENCLAW_COMMANDS_*`, `OPENCLAW_HOOKS_*`
+- Channels: `OPENCLAW_TELEGRAM_*`, `OPENCLAW_DISCORD_*`, `OPENCLAW_SLACK_*`, `OPENCLAW_WHATSAPP_*`, `OPENCLAW_GOOGLECHAT_*`, `OPENCLAW_MATTERMOST_*`, `OPENCLAW_SIGNAL_*`, `OPENCLAW_IRC_*`
+- Gateway and UI: `OPENCLAW_GATEWAY_*`, `OPENCLAW_CONTROL_UI_*`, `OPENCLAW_ALLOWED_ORIGINS_JSON`, `OPENCLAW_TAILSCALE_*`, `OPENCLAW_TRUSTED_PROXIES_JSON`
+- Plugins and MCP/ACPX: `OPENCLAW_PLUGIN_*`, `OPENCLAW_ACPX_*`, `OPENCLAW_GITHUB_TOKEN`, `OPENCLAW_GITEA_*`, `PLUGINS`
 
-Token/Secret-basierte Channels haben bewusst **kein** separates `*_ENABLED`: das Token/Secret ist der Enabler.
+For token/secret-based channels, there is intentionally no separate `*_ENABLED` toggle: the token/secret is the feature enabler.
 
-Vollständige Liste der Einzel-Overrides:
+Special case:
 
-```bash
-OPENCLAW_LOGGING_LEVEL
-OPENCLAW_AUTH_PROFILE_PROVIDER
-OPENCLAW_AUTH_PROFILE_MODE
-OPENCLAW_MODELS_MODE
-OPENCLAW_LITELLM_API
-OPENCLAW_LITELLM_MODELS_JSON
-OPENCLAW_OPENAI_BASE_URL
-OPENCLAW_OPENAI_MODELS_JSON
-OPENCLAW_AGENT_SANDBOX_MODE
-OPENCLAW_AGENT_WORKSPACE_ACCESS
-OPENCLAW_AGENT_MODELS_JSON
-OPENCLAW_SUBAGENT_TIMEOUT_SECONDS
-OPENCLAW_SUBAGENT_MAX_CONCURRENT
-OPENCLAW_TOOLS_FS_WORKSPACE_ONLY
-OPENCLAW_LOOP_DETECTION_ENABLED
-OPENCLAW_LOOP_DETECTION_WARNING_THRESHOLD
-OPENCLAW_LOOP_DETECTION_CRITICAL_THRESHOLD
-OPENCLAW_LOOP_DETECTION_GLOBAL_CIRCUIT_BREAKER_THRESHOLD
-OPENCLAW_MEDIA_AUDIO_ENABLED
-OPENCLAW_MEDIA_AUDIO_ECHO_TRANSCRIPT
-OPENCLAW_MEDIA_AUDIO_PROVIDER
-OPENCLAW_MEDIA_AUDIO_MODEL
-OPENCLAW_TTS_AUTO
-OPENCLAW_TTS_PROVIDER
-OPENCLAW_TTS_MODEL_OVERRIDES_ENABLED
-OPENCLAW_MESSAGES_QUEUE_DEBOUNCE_MS
-OPENCLAW_MESSAGES_QUEUE_CAP
-OPENCLAW_COMMANDS_NATIVE
-OPENCLAW_COMMANDS_NATIVE_SKILLS
-OPENCLAW_COMMANDS_RESTART
-OPENCLAW_COMMANDS_OWNER_DISPLAY
-OPENCLAW_HOOKS_INTERNAL_ENABLED
-OPENCLAW_HOOKS_COMMAND_LOGGER_ENABLED
-OPENCLAW_HOOKS_SESSION_MEMORY_ENABLED
-OPENCLAW_HOOKS_BOOTSTRAP_EXTRA_FILES_ENABLED
-OPENCLAW_HOOKS_BOOT_MD_ENABLED
-OPENCLAW_TELEGRAM_DM_POLICY
-OPENCLAW_TELEGRAM_ALLOW_FROM_JSON
-OPENCLAW_TELEGRAM_GROUPS_JSON
-OPENCLAW_TELEGRAM_GROUP_POLICY
-OPENCLAW_TELEGRAM_STREAMING_MODE
-OPENCLAW_DISCORD_DM_POLICY
-OPENCLAW_DISCORD_ALLOW_FROM_JSON
-OPENCLAW_DISCORD_STREAMING_MODE
-OPENCLAW_SLACK_APP_TOKEN
-OPENCLAW_SLACK_DM_POLICY
-OPENCLAW_SLACK_ALLOW_FROM_JSON
-OPENCLAW_SLACK_NATIVE_TRANSPORT
-OPENCLAW_SLACK_STREAMING_MODE
-OPENCLAW_WHATSAPP_ENABLED
-OPENCLAW_WHATSAPP_DM_POLICY
-OPENCLAW_WHATSAPP_ALLOW_FROM_JSON
-OPENCLAW_WHATSAPP_TEXT_CHUNK_LIMIT
-OPENCLAW_WHATSAPP_CHUNK_MODE
-OPENCLAW_WHATSAPP_MEDIA_MAX_MB
-OPENCLAW_WHATSAPP_SEND_READ_RECEIPTS
-OPENCLAW_WHATSAPP_GROUPS_JSON
-OPENCLAW_WHATSAPP_GROUP_POLICY
-OPENCLAW_CHANNEL_DEFAULTS_JSON
-OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_JSON
-OPENCLAW_GOOGLECHAT_SERVICE_ACCOUNT_FILE
-OPENCLAW_GOOGLECHAT_DM_ENABLED
-OPENCLAW_GOOGLECHAT_DM_POLICY
-OPENCLAW_GOOGLECHAT_ALLOW_FROM_JSON
-OPENCLAW_GOOGLECHAT_GROUP_POLICY
-OPENCLAW_MATTERMOST_BOT_TOKEN
-OPENCLAW_MATTERMOST_BASE_URL
-OPENCLAW_MATTERMOST_DM_POLICY
-OPENCLAW_SIGNAL_ENABLED
-OPENCLAW_SIGNAL_ACCOUNT
-OPENCLAW_SIGNAL_DM_POLICY
-OPENCLAW_SIGNAL_ALLOW_FROM_JSON
-OPENCLAW_BLUEBUBBLES_DM_POLICY
-OPENCLAW_BLUEBUBBLES_SERVER_URL
-OPENCLAW_BLUEBUBBLES_PASSWORD
-OPENCLAW_IMESSAGE_ENABLED
-OPENCLAW_IMESSAGE_DM_POLICY
-OPENCLAW_IMESSAGE_ALLOW_FROM_JSON
-OPENCLAW_MATRIX_HOMESERVER
-OPENCLAW_MATRIX_ACCESS_TOKEN
-OPENCLAW_MSTEAMS_CONFIG_WRITES
-OPENCLAW_MSTEAMS_APP_ID
-OPENCLAW_MSTEAMS_APP_PASSWORD
-OPENCLAW_MSTEAMS_TENANT_ID
-OPENCLAW_IRC_ENABLED
-OPENCLAW_IRC_DM_POLICY
-OPENCLAW_IRC_CONFIG_WRITES
-OPENCLAW_IRC_HOST
-OPENCLAW_IRC_PORT
-OPENCLAW_IRC_TLS
-OPENCLAW_IRC_NICKSERV_ENABLED
-OPENCLAW_IRC_NICKSERV_SERVICE
-OPENCLAW_IRC_NICKSERV_PASSWORD
-OPENCLAW_IRC_NICKSERV_REGISTER
-OPENCLAW_IRC_NICKSERV_REGISTER_EMAIL
-OPENCLAW_EXTRA_CHANNELS_JSON
-OPENCLAW_GATEWAY_MODE
-OPENCLAW_GATEWAY_BIND
-OPENCLAW_GATEWAY_INTERNAL_PORT
-OPENCLAW_GATEWAY_AUTH_MODE
-OPENCLAW_CONTROL_UI_ENABLED
-OPENCLAW_CONTROL_UI_ALLOW_HOST_HEADER_ORIGIN_FALLBACK
-OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH
-OPENCLAW_CONTROL_UI_DISABLE_DEVICE_AUTH
-OPENCLAW_ALLOWED_ORIGINS_JSON
-OPENCLAW_TAILSCALE_MODE
-OPENCLAW_TAILSCALE_RESET_ON_EXIT
-OPENCLAW_TRUSTED_PROXIES_JSON
-OPENCLAW_SKILLS_INSTALL_NODE_MANAGER
-OPENCLAW_BRAVE_ENABLED
-OPENCLAW_DUCKDUCKGO_ENABLED
-OPENCLAW_ACPX_ENABLED
-OPENCLAW_ACPX_GITHUB_COMMAND
-OPENCLAW_ACPX_GITHUB_ARGS_JSON
-OPENCLAW_ACPX_GITEA_COMMAND
-OPENCLAW_ACPX_GITEA_ARGS_JSON
-OPENCLAW_GITEA_HOST
-OPENCLAW_GITEA_TOKEN
-OPENCLAW_GITEA_INSECURE
-OPENCLAW_MCP_GATEWAY_URL
-OPENCLAW_PLUGIN_ENTRIES_JSON
-OPENCLAW_PLUGIN_SPECS_JSON
-OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED
-OPENCLAW_PLUGIN_AUTO_INSTALL_STRICT
-OPENCLAW_PLUGIN_AUTO_INSTALL_PREFIX
-OPENCLAW_PLUGIN_AUTO_INSTALL_SKIP_JSON
-PLUGINS
-```
+- `OPENCLAW_ALLOWED_ORIGINS_JSON` sets `gateway.controlUi.allowedOrigins`.
+- There is no built-in default for `allowedOrigins`; if not set, the field is not written.
 
-Pflichtpunkt ohne Default-Hardcoding:
+Model handling:
 
-- `OPENCLAW_ALLOWED_ORIGINS_JSON` setzt `gateway.controlUi.allowedOrigins`.
-- Es gibt dafür **keinen** eingebauten Default mehr; wenn nicht gesetzt, wird `allowedOrigins` nicht in die Config geschrieben.
+- Agent model mappings can be set via `OPENCLAW_AGENT_MODELS_JSON`.
+- Provider model catalogs are managed per provider (`models.providers.*.models`), including LiteLLM discovery via `LITELLM_URL` + `LITELLM_MASTER_KEY`.
 
-Model-Handling:
+For a full technical variable reference, use the gateway service environment block in `docker-compose.yml` and the template defaults in `files/openclaw.json.j2`.
 
-- Agent-Model-Mappings sind über `OPENCLAW_AGENT_MODELS_JSON` konfigurierbar.
-- Provider-Modelle werden generisch über den jeweiligen Provider geführt (`models.providers.*.models`, LiteLLM Discovery via `LITELLM_URL` + `LITELLM_MASTER_KEY`).
-
-### Configuration Features
-
-The OpenClaw configuration is **Jinja2-templated**, allowing dynamic feature enablement based on environment variables. Features are **only included in the generated config if their corresponding API keys are provided**.
-
-**Examples:**
-
-**Minimal setup** (only required vars):
-```bash
-npm start  # Config has only gateway + sandbox + basic tools
-```
-
-**With Telegram channel** (add to .env):
-```bash
-OPENCLAW_TELEGRAM_BOT_TOKEN=123:ABC...
-npm start  # Telegram channel included in config
-```
-
-**With all skills and channels** (add to .env):
-```bash
-OPENCLAW_NOTION_API_KEY=...
-OPENCLAW_GITHUB_TOKEN=...
-OPENCLAW_TELEGRAM_BOT_TOKEN=...
-OPENCLAW_DISCORD_BOT_TOKEN=...
-OPENCLAW_ELEVENLABS_API_KEY=...  # enables TTS
-npm start  # All features enabled
-```
-
-**Production with Docker Secrets** (in compose file):
-```yaml
-services:
-  openclaw-gateway:
-    environment:
-      # Pass empty - mapped from secrets automatically
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
-      OPENCLAW_WHISPER_API_KEY: ${OPENCLAW_WHISPER_API_KEY:-}
-      # ... other feature keys
-```
-
-Then provide secrets via docker secret or mounted `/run/secrets/*` files.
-
-#### Conditional Features
-
-- **LiteLLM**: Enabled if `LITELLM_MASTER_KEY` set; adds LiteLLM provider and auth profile
-- **OpenAI**: Enabled if `OPENAI_API_KEY` set; adds OpenAI provider
-- **Default Model**: `litellm/openrouter/anthropic/claude-sonnet-4` with LiteLLM, `openai/gpt-4o` without; override with `OPENCLAW_PRIMARY_MODEL`
-- **Audio (Whisper)**: Enabled if `OPENAI_API_KEY` set
-- **TTS Provider**: ElevenLabs if `OPENCLAW_ELEVENLABS_API_KEY` set, else Microsoft
-- **Search Plugin**: Brave if `OPENCLAW_BRAVE_API_KEY` set, else DuckDuckGo (always present)
-- **Cron Scheduler**: Enabled by default (`OPENCLAW_CRON_ENABLED=true`); set to `false` to disable
-- **Channels**: Telegram, Discord, Slack, Google Chat, Mattermost, Matrix, Microsoft Teams, BlueBubbles are enabled by credentials/secrets; WhatsApp, Signal, iMessage, IRC by explicit channel config flags
-- **GitHub/Gitea (ACPX)**: GitHub MCP server is included when `OPENCLAW_GITHUB_TOKEN` is set; Gitea MCP server is included when `OPENCLAW_GITEA_HOST` and `OPENCLAW_GITEA_TOKEN` are set
-- **Skills**: Notion, Trello, ElevenLabs, OpenAI Whisper — only included if API keys provided
-- **Plugins (generic)**: Any plugin config in `plugins.entries` is supported via `OPENCLAW_PLUGINS_JSON` or `OPENCLAW_PLUGIN_ENTRIES_JSON`; configured plugin IDs can be auto-installed on startup
-
-#### Schema Source
-
-The full section list above is taken from the official OpenClaw config schema in `openclaw/openclaw`:
-
-- `src/config/schema.base.generated.ts` (branch `main`, commit `d63671fce0ce60a87fdf073b2d7a47ac4f9e04ef`)
-
-## Custom Configuration
-
-The default `openclaw.json` is baked into the gateway image. On first start, it is copied to `~/.openclaw/openclaw.json`. To use your own configuration, mount or copy a custom `openclaw.json` into the config volume:
-
-```bash
-# Copy into the running container
-docker cp my-openclaw.json openclaw-gateway-1:/home/node/.openclaw/openclaw.json
-
-# Or mount a host directory
-# OPENCLAW_CONFIG_DIR=/path/to/my/config docker compose up -d
-```
-
-By default, the config is only copied on first start and preserved across restarts. The included `docker-compose.yml` sets `OVERWRITE_CONFIG=true` so the baked-in default is always written — unset it to keep manual changes.
-
-## OpenClaw MCP Gateway (Optional)
-
-The `openclaw-mcp-gateway` service ([mwaeckerlin/openclaw-mcp-gateway](https://github.com/mwaeckerlin/openclaw-mcp-gateway)) provides a secure MCP interface for the sandboxed AI agent to execute `openclaw` CLI commands in the server. It is **optional** — remove the `openclaw-mcp-gateway` service from `docker-compose.yml` to disable it.
-
-**Who needs this?** Users who want the AI agent to manage cron jobs, check gateway status, list sessions and myn other functions from within the sandbox. Without the MCP gateway, the agent has no way to interact with the OpenClaw gateway (by design — the sandbox has no gateway token).
-
-**What it does:** The MCP gateway holds the gateway token and exposes a fixed allowlist of operations (status checks, cron management) as MCP tools. The sandbox agent connects to the MCP gateway — never directly to the OpenClaw gateway. This keeps the gateway token out of the sandbox.
-
-**Network isolation:** Always seggregate your networks. This is especieally important here, so that the agent in the SSH sandbox cannot sniff th etoken.
-
-**Configuration:** `OPENCLAW_GATEWAY_TOKEN` must be set (same token as the main gateway). In production, use Docker secrets. `OPENCLAW_GATEWAY_URL` defaults to `http://openclaw-gateway:18789`. Override if your setup differs. `OPENCLAW_MCP_GATEWAY_IMAGE` selects the MCP gateway image and is used as skill source while building gateway and sandbox images. This image must provide `/app/skills/openclaw-mcp-gateway/SKILL.md`. Gateway skills are packaged under `/app/skills`. Sandbox skills are packaged under `/opt/openclaw/skills`; on sandbox startup they are copied into every existing `~/workspaces/*/skills/<skill-name>/SKILL.md`.
-
-**Device pairing:** The MCP gateway authenticates to the OpenClaw gateway via an Ed25519 device identity. Generate the keypair with `node generate-device-pairing.mjs` (see [Development Setup](#development-setup)). This sets:
-
-| Variable | Where | Description |
-|---|---|---|
-| `OPENCLAW_DEVICE_IDENTITY` | MCP gateway | JSON-encoded private key + deviceId for the MCP gateway |
-| `OPENCLAW_DEVICE_PAIRING` | OpenClaw gateway | JSON-encoded pairing record; written verbatim to `devices/paired.json` |
-
-Both are automatically read from `.env` by Docker Compose. In production, use Docker secrets (`openclaw_device_identity`, `openclaw_device_pairing`).
-
-## Device Pre-Seeding (Optional)
-
-Pre-seed one or more paired devices at gateway startup, so they are recognized on first connect without interactive approval. This is useful for headless setups, CI/CD pipelines, or automated deployments.
-
-**Who needs this?** Admins who deploy OpenClaw without interactive access to the Control UI, e.g. in Docker Swarm, Kubernetes, or Ansible-managed environments.
-
-Set `OPENCLAW_DEVICE_PAIRING` (env var) or provide the Docker secret `openclaw_device_pairing`. The value is a JSON string that is written **verbatim** to `$OPENCLAW_STATE_DIR/devices/paired.json` (default: `~/.openclaw/devices/paired.json`). The content is the **authoritative** pairing state — it replaces any existing `paired.json` on every startup.
-
-**No transformation is applied.** The JSON must match OpenClaw's internal pairing structure exactly, as defined in `src/infra/device-pairing.ts`. The admin is responsible for providing the correct and complete structure. Refer to the OpenClaw source files for the current expected fields:
-
-- `src/infra/device-pairing.ts` — pairing entry structure
-- `src/infra/pairing-files.ts` — file paths and format
-- `src/config/paths.ts` — `OPENCLAW_STATE_DIR` resolution
-
-**Example** (in `.env`):
-
-```bash
-OPENCLAW_DEVICE_PAIRING='{"my-device":{"deviceId":"my-device","publicKey":"...","role":"operator","roles":["operator"],"scopes":["operator.admin"],"approvedScopes":["operator.admin"],"tokens":{"operator":{"token":"...","role":"operator","scopes":["operator.admin"],"createdAtMs":1713520000000}},"createdAtMs":1713520000000,"approvedAtMs":1713520000000}}'
-```
-
-**With Docker secrets:**
-
-```bash
-docker secret create openclaw_device_pairing pairing.json
-```
-
-The secret is auto-mapped to `OPENCLAW_DEVICE_PAIRING` by the gateway entrypoint.
 
 ## Docker-in-Docker (Optional)
 
@@ -552,43 +334,11 @@ The `openclaw-dind` service provides an isolated Docker daemon for the sandbox. 
 
 Docker Swarm does not support `privileged: true` in stack deploy files. Docker-in-Docker is therefore not supported in this Swarm setup.
 
-## Architecture
+### Production Checklist
 
-```plantuml
-@startuml
-skinparam componentStyle rectangle
-
-actor User as user
-
-node "mwaeckerlin/openclaw:gateway" as gw {
-  [Control Plane\nLLM Proxy\nWeb UI] as ctrl
-  storage "openclaw-config" as cfg
-  ctrl - cfg
-}
-
-node "mwaeckerlin/openclaw-mcp-gatewy" {
-  [MCP OpenClaw Server] as mcp
-}
-
-node "mwaeckerlin/openclaw:sandbox" as sb {
-  [sshd :22\nlogin: somebody] as sshd
-  storage "openclaw-workspace" as ws
-  sshd -left- ws
-}
-
-node "openclaw-dind" as dind {
-  [Docker Daemon] as dd
-  storage "openclaw-docker" as dv
-  dd -right- dv
-}
-
-component "allow-write-access" as aw
-
-user --> ctrl : "HTTP :18789"
-ctrl --> sshd : "SSH (key auth)"
-sshd --up--> mcp : openclaw cli commands
-mcp --up--> ctrl : forward cli command
-sshd -right-> dd : "DOCKER_HOST\ntcp://openclaw-dind:2375"
-aw .left.> cfg : "chown"
-@enduml
-```
+- [ ] All secrets via `docker secret`, not environment variables
+- [ ] Encrypted overlay network (`--opt encrypted`)
+- [ ] Port 18789 behind TLS reverse proxy (nginx, Traefik, Kong)
+- [ ] Port 18790 not exposed (internal bridge only)
+- [ ] Firewall restricts access to gateway port
+- [ ] Consider `read_only: true` + `tmpfs` mounts if OpenClaw supports it

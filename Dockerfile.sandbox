@@ -1,4 +1,3 @@
-ARG OPENCLAW_MCP_GATEWAY_IMAGE="mwaeckerlin/openclaw-mcp-gateway"
 ARG PACKAGES="openssh-server docker.io docker-compose-v2"
 ARG CONFIGURATION_COMMANDS=" \
   sed -i \
@@ -11,7 +10,8 @@ ARG CONFIGURATION_COMMANDS=" \
   && adduser \${RUN_USER} docker \
   && install -m 700 -o \${RUN_USER} -g \${RUN_GROUP} /dev/null /etc/environment \
   "
-FROM ${OPENCLAW_MCP_GATEWAY_IMAGE} AS mcp_gateway_skills
+
+FROM mwaeckerlin/openclaw-mcp-gateway AS mcp_gateway_skills
 
 FROM mwaeckerlin/ubuntu-base AS build
 ENV CONTAINERNAME    "openclaw"
