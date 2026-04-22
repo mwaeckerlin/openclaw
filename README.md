@@ -15,7 +15,6 @@ Combine OpenClaw with Security and Easiness! Run out of the box a secure docker 
 
 <details>
 <summary>PlantUML source</summary>
-
 ```plantuml
 @startuml overview
 cloud Docker {
@@ -78,7 +77,6 @@ Acceptable in a controlled internal Docker network where DNS is managed by Docke
 
 <details>
 <summary>PlantUML source</summary>
-
 ```plantuml
 @startuml architecture
 actor User as user
