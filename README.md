@@ -12,7 +12,10 @@ Combine OpenClaw with Security and Easiness! Run out of the box a secure docker 
 **Target audience:** Security aware **developer** with some basic docker know how. Everybody else: **Keep your hands away from OpenClaw!**
 
 ![](doc/overview.svg)
+
 <div hidden>
+
+```plantuml
 @startuml overview
 cloud Docker {
   component [Openclaw:Gateway] {
@@ -26,6 +29,8 @@ cloud Docker {
 :Agent: --> [Ubuntu] : execute\ncommands
 [Gateway] -> [Ubuntu] : ssh
 @enduml
+```
+
 </div>
 
 ## Security Model
@@ -69,7 +74,10 @@ Acceptable in a controlled internal Docker network where DNS is managed by Docke
 ## Full Architecture
 
 ![](doc/architecture.svg)
+
 <div hidden>
+
+```plantuml
 @startuml architecture
 actor User as user
 
@@ -113,6 +121,8 @@ gh ----> [GitHib]
 sshd -down-> dd : docker
 aw .up.> cfg : chown
 @enduml
+```
+
 </div>
 
 ## Local Development Setup
