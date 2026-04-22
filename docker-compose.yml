@@ -84,11 +84,6 @@ services:
       OPENCLAW_SKILLS_JSON: ${OPENCLAW_SKILLS_JSON:-}
       OPENCLAW_PLUGINS_JSON: ${OPENCLAW_PLUGINS_JSON:-}
       OPENCLAW_PLUGIN_ENTRIES_JSON: ${OPENCLAW_PLUGIN_ENTRIES_JSON:-}
-      OPENCLAW_PLUGIN_SPECS_JSON: ${OPENCLAW_PLUGIN_SPECS_JSON:-}
-      OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED: ${OPENCLAW_PLUGIN_AUTO_INSTALL_ENABLED:-}
-      OPENCLAW_PLUGIN_AUTO_INSTALL_STRICT: ${OPENCLAW_PLUGIN_AUTO_INSTALL_STRICT:-}
-      OPENCLAW_PLUGIN_AUTO_INSTALL_PREFIX: ${OPENCLAW_PLUGIN_AUTO_INSTALL_PREFIX:-}
-      OPENCLAW_PLUGIN_AUTO_INSTALL_SKIP_JSON: ${OPENCLAW_PLUGIN_AUTO_INSTALL_SKIP_JSON:-}
       PLUGINS: ${PLUGINS:-}
       # Individual overrides for template defaults
       OPENCLAW_LOGGING_LEVEL: ${OPENCLAW_LOGGING_LEVEL:-}
@@ -214,16 +209,6 @@ services:
     init: true
     security_opt:
       - no-new-privileges:true
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     restart: unless-stopped
     networks:
       - gateway-sandbox
@@ -243,12 +228,6 @@ services:
     security_opt:
       - no-new-privileges:true
     pids_limit: 256
-    healthcheck:
-      test: ["CMD", "pgrep", "-x", "sshd"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
     depends_on:
       openclaw-dind:
         condition: service_started
@@ -265,12 +244,6 @@ services:
       DOCKER_TLS_CERTDIR: ""
     volumes:
       - openclaw-docker:/var/lib/docker
-    healthcheck:
-      test: ["CMD", "docker", "info"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
     restart: unless-stopped
     networks:
       - sandbox-dind
