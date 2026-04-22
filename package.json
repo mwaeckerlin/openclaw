@@ -2,7 +2,8 @@
   "name": "@mwaeckerlin/openclaw",
   "version": "1.0.0",
   "scripts": {
-    "build": "docker compose build",
+    "build": "npm run build:doc && docker compose build",
+    "build:doc": "plantuml -tsvg -o doc README.md",
     "start": "docker compose up --build --force-recreate --remove-orphans",
     "start:daemon": "docker compose up -d --build --force-recreate --remove-orphans",
     "start:dev": "docker compose up --build --force-recreate --remove-orphans",

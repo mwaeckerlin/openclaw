@@ -1,5 +1,4 @@
-ARG OPENCLAW_MCP_GATEWAY_IMAGE="mwaeckerlin/openclaw-mcp-gateway"
-FROM ${OPENCLAW_MCP_GATEWAY_IMAGE} AS mcp_gateway_skills
+FROM mwaeckerlin/openclaw-mcp-gateway AS mcp_gateway_skills
 
 FROM alpine/openclaw:latest
 RUN cd /tmp && npm install nunjucks
