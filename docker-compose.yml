@@ -230,6 +230,7 @@ services:
       OPENCLAW_SANDBOX_SSH_PUBLIC_KEY:
       DOCKER_HOST: tcp://openclaw-dind:2375
       OPENCLAW_MCP_GATEWAY_URL: http://openclaw-mcp-gateway:4000
+      MCP_GITHUB_URL: http://mcp-github:4000
     volumes:
       - openclaw-workspace:/home/somebody
     security_opt:
@@ -238,11 +239,14 @@ services:
     depends_on:
       openclaw-dind:
         condition: service_started
+      mcp-github:
+        condition: service_started
     restart: unless-stopped
     networks:
       - gateway-sandbox
       - sandbox-dind
       - sandbox-mcp-gateway
+      - sandbox-mcp-github
 
   openclaw-dind:
     image: docker:dind
@@ -271,6 +275,16 @@ services:
       - gateway-mcp-gateway
       - sandbox-mcp-gateway
 
+  mcp-github:
+    image: mwaeckerlin/mcp-github
+    environment:
+      GITHUB_TOKEN:
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - sandbox-mcp-github
+
   allow-write-access:
     image: mwaeckerlin/allow-write-access
     environment:
@@ -283,6 +297,7 @@ networks:
   sandbox-dind:
   gateway-mcp-gateway:
   sandbox-mcp-gateway:
+  sandbox-mcp-github:
 
 volumes:
   openclaw-config:

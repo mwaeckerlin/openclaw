@@ -1,6 +1,7 @@
 FROM mwaeckerlin/openclaw-mcp-gateway AS mcp_gateway_skills
+FROM mwaeckerlin/mcp-github AS mcp_github_skills
 
-FROM alpine/openclaw:latest
+FROM alpine/openclaw:latest AS build
 RUN cd /tmp && npm install nunjucks
 ENV NODE_PATH=/tmp/node_modules
 RUN install -d -m 700 /home/node/.ssh
@@ -10,7 +11,10 @@ ADD files/render-config.js /render-config.js
 ADD files/openclaw.json.j2 /openclaw.json.j2.default
 ADD files/SKILL.md /app/skills/ssh-sandbox/SKILL.md
 COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway/SKILL.md /app/skills/openclaw-mcp-gateway/SKILL.md
+COPY --from=mcp_github_skills /app/skills/mcp-github/SKILL.md /app/skills/mcp-github/SKILL.md
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=60 \
   CMD node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789"]
+
+FROM build
