@@ -33,15 +33,6 @@ try {
   // Parse and post-process
   let config = JSON.parse(json);
 
-  // Resolve __AUTO_MODEL__: LiteLLM model if LITELLM_MASTER_KEY set, else OpenAI model
-  if (config.agents?.defaults?.model?.primary === '__AUTO_MODEL__') {
-    if (env.LITELLM_MASTER_KEY) {
-      config.agents.defaults.model.primary = 'litellm/openrouter/anthropic/claude-sonnet-4';
-    } else {
-      config.agents.defaults.model.primary = 'openai/gpt-4o';
-    }
-  }
-
   // Merge channels_* into single channels object
   const channels = {};
   for (const key of Object.keys(config)) {

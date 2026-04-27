@@ -62,11 +62,40 @@
         "models": {{ OPENCLAW_LITELLM_MODELS_JSON | default('[]', true) }}
       },
 {% endif %}
+{% if LITELLM_MASTER_KEY | default('') | length > 0 %}
+      "litellm": {
+        "baseUrl": "{{ LITELLM_BASE_URL | default('http://litellm:4000', true) }}",
+        "api": "{{ OPENCLAW_LITELLM_API | default('openai-completions', true) }}",
+        "apiKey": "${LITELLM_MASTER_KEY}",
+        "models": {{ OPENCLAW_LITELLM_MODELS_JSON | default('[]', true) }}
+      },
+{% endif %}
+{% if OPENROUTER_API_KEY | default('') | length > 0 %}
+      "openrouter": {
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "apiKey": "${OPENROUTER_API_KEY}",
+        "models": {{ OPENCLAW_OPENROUTER_MODELS_JSON | default('[]', true) }}
+      },
+{% endif %}
 {% if OPENAI_API_KEY | default('') | length > 0 %}
       "openai": {
         "baseUrl": "{{ OPENCLAW_OPENAI_BASE_URL | default('https://api.openai.com/v1', true) }}",
         "apiKey": "${OPENAI_API_KEY}",
         "models": {{ OPENCLAW_OPENAI_MODELS_JSON | default('[]', true) }}
+      },
+{% endif %}
+{% if ANTHROPIC_API_KEY | default('') | length > 0 %}
+      "anthropic": {
+        "baseUrl": "https://api.anthropic.com/v1",
+        "apiKey": "${ANTHROPIC_API_KEY}",
+        "models": {{ OPENCLAW_ANTHROPIC_MODELS_JSON | default('[]', true) }}
+      },
+{% endif %}
+{% if GEMINI_API_KEY | default('') | length > 0 %}
+      "google": {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "apiKey": "${GEMINI_API_KEY}",
+        "models": {{ OPENCLAW_GEMINI_MODELS_JSON | default('[]', true) }}
       },
 {% endif %}
       "_end": true
@@ -95,7 +124,19 @@
         }
       },
       "model": {
-        "primary": "{{ OPENCLAW_PRIMARY_MODEL | default('__AUTO_MODEL__', true) }}"
+{% if OPENCLAW_PRIMARY_MODEL | default('') | length > 0 %}
+        "primary": "{{ OPENCLAW_PRIMARY_MODEL }}"
+{% elif LITELLM_MASTER_KEY | default('') | length > 0 %}
+        "primary": "litellm/openrouter/anthropic/claude-sonnet-4"
+{% elif OPENROUTER_API_KEY | default('') | length > 0 %}
+        "primary": "openrouter/anthropic/claude-sonnet-4"
+{% elif OPENAI_API_KEY | default('') | length > 0 %}
+        "primary": "openai/gpt-4o"
+{% elif ANTHROPIC_API_KEY | default('') | length > 0 %}
+        "primary": "anthropic/claude-sonnet-4-5"
+{% elif GEMINI_API_KEY | default('') | length > 0 or GOOGLE_API_KEY | default('') | length > 0 %}
+        "primary": "google/gemini-2.5-pro"
+{% endif %}
       },
 {% if OPENCLAW_AGENT_MODELS_JSON | default('') | length > 0 %}
       "models": {{ OPENCLAW_AGENT_MODELS_JSON }},

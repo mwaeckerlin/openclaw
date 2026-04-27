@@ -13,6 +13,12 @@ if [ -z "$OPENCLAW_WHISPER_API_KEY" -a -n "$OPENAI_API_KEY" ]; then
   echo "OPENCLAW_WHISPER_API_KEY set from OPENAI_API_KEY"
 fi
 
+echo "==== Setting Gemini API Key ===="
+if [ -z "$GEMINI_API_KEY" ] && [ -n "$GOOGLE_API_KEY" ]; then
+  export GEMINI_API_KEY="$GOOGLE_API_KEY"
+  echo "GEMINI_API_KEY set from GOOGLE_API_KEY"
+fi
+
 echo "==== Setting SSH Authorized Key ===="
 if [ -z "$OPENCLAW_SANDBOX_SSH_PRIVATE_KEY" ]; then
   echo "ERROR: No SSH private key provided for sandbox. Please set OPENCLAW_SANDBOX_SSH_PRIVATE_KEY variable or provide a secret named openclaw_sandbox_ssh_private_key." >&2
@@ -78,10 +84,11 @@ fi
 
 if [ -n "$LITELLM_URL" ] && [ -n "$LITELLM_MASTER_KEY" ]; then
   echo "==== Discovering LiteLLM Models ===="
-  model_count=$(curl -sf -H "Authorization: Bearer $LITELLM_MASTER_KEY" "$LITELLM_URL/v1/models" 2>/dev/null | node -e "
+  if model_count=$(curl -sf -H "Authorization: Bearer $LITELLM_MASTER_KEY" "$LITELLM_URL/v1/models" 2>/dev/null | node -e "
     const fs = require('fs');
     const cfgPath = process.argv[1];
     const providerId = process.argv[2];
+    const syncDiscoveredToAgentList = process.argv[3] === 'true';
     const raw = fs.readFileSync(0, 'utf8');
     if (!raw || !raw.trim()) process.exit(2);
     const data = JSON.parse(raw);
@@ -96,14 +103,31 @@ if [ -n "$LITELLM_URL" ] && [ -n "$LITELLM_MASTER_KEY" ]; then
       cfg.models.providers[providerId] = {};
     }
     cfg.models.providers[providerId].models = models;
+    if (syncDiscoveredToAgentList) {
+      if (!cfg.agents || typeof cfg.agents !== 'object') cfg.agents = {};
+      if (!cfg.agents.defaults || typeof cfg.agents.defaults !== 'object') cfg.agents.defaults = {};
+      if (!cfg.agents.defaults.models || typeof cfg.agents.defaults.models !== 'object') cfg.agents.defaults.models = {};
+      Object.assign(cfg.agents.defaults.models, Object.fromEntries(
+        models.map((m) => [providerId + '/' + m.id, {}]),
+      ));
+    }
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
     process.stdout.write(String(models.length));
-  " "$HOME/.openclaw/openclaw.json" "litellm") || {
-    echo "ERROR: Failed to discover models from LiteLLM at $LITELLM_URL" >&2
-    exit 1
-  }
-  echo "  Discovered $model_count models from LiteLLM"
-  echo "Models injected into config"
+  " "$HOME/.openclaw/openclaw.json" "litellm" "$([ -z "${OPENCLAW_AGENT_MODELS_JSON:-}" ] && [ -z "${OPENCLAW_AGENTS_JSON:-}" ] && echo true || echo false)"); then
+    echo "  Discovered $model_count models from LiteLLM"
+    echo "Models injected into config"
+    if [ -z "${OPENCLAW_AGENT_MODELS_JSON:-}" ] && [ -z "${OPENCLAW_AGENTS_JSON:-}" ]; then
+      agent_model_count=$(node -e "
+        const fs = require('fs');
+        const cfg = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+        const models = ((((cfg || {}).agents || {}).defaults || {}).models);
+        process.stdout.write(String(models && typeof models === 'object' ? Object.keys(models).length : 0));
+      " "$HOME/.openclaw/openclaw.json")
+      echo "  Agent model options synchronized from LiteLLM provider list ($agent_model_count entries)"
+    fi
+  else
+    echo "WARN: Could not discover LiteLLM models from $LITELLM_URL (continuing with configured/default list)" >&2
+  fi
 fi
 
 if [ -n "$OPENAI_API_KEY" ] && [ -z "$OPENCLAW_OPENAI_MODELS_JSON" ]; then
@@ -132,9 +156,10 @@ if [ -n "$OPENAI_API_KEY" ] && [ -z "$OPENCLAW_OPENAI_MODELS_JSON" ]; then
     if (syncDiscoveredToAgentList) {
       if (!cfg.agents || typeof cfg.agents !== 'object') cfg.agents = {};
       if (!cfg.agents.defaults || typeof cfg.agents.defaults !== 'object') cfg.agents.defaults = {};
-      cfg.agents.defaults.models = Object.fromEntries(
+      if (!cfg.agents.defaults.models || typeof cfg.agents.defaults.models !== 'object') cfg.agents.defaults.models = {};
+      Object.assign(cfg.agents.defaults.models, Object.fromEntries(
         models.map((m) => [providerId + '/' + m.id, {}]),
-      );
+      ));
     }
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
     process.stdout.write(String(models.length));
@@ -166,6 +191,141 @@ if [ -n "$OPENAI_API_KEY" ] && [ -z "$OPENCLAW_OPENAI_MODELS_JSON" ]; then
     fi
   else
     echo "WARN: Could not discover OpenAI models from $_openai_url (continuing with configured/default list)" >&2
+  fi
+fi
+
+if [ -n "$OPENROUTER_API_KEY" ] && [ -z "$OPENCLAW_OPENROUTER_MODELS_JSON" ]; then
+  echo "==== Discovering OpenRouter Models ===="
+  if model_count=$(curl -sf -H "Authorization: Bearer $OPENROUTER_API_KEY" "https://openrouter.ai/api/v1/models" 2>/dev/null | node -e "
+    const fs = require('fs');
+    const cfgPath = process.argv[1];
+    const providerId = process.argv[2];
+    const syncDiscoveredToAgentList = process.argv[3] === 'true';
+    const raw = fs.readFileSync(0, 'utf8');
+    if (!raw || !raw.trim()) process.exit(2);
+    const data = JSON.parse(raw);
+    const rows = Array.isArray(data?.data) ? data.data : [];
+    const models = rows
+      .filter((m) => m && typeof m.id === 'string')
+      .map((m) => ({ id: m.id, name: typeof m.name === 'string' && m.name.length > 0 ? m.name : m.id }));
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    if (!cfg.models || typeof cfg.models !== 'object') cfg.models = {};
+    if (!cfg.models.providers || typeof cfg.models.providers !== 'object') cfg.models.providers = {};
+    if (!cfg.models.providers[providerId] || typeof cfg.models.providers[providerId] !== 'object') {
+      cfg.models.providers[providerId] = {};
+    }
+    cfg.models.providers[providerId].models = models;
+    if (syncDiscoveredToAgentList) {
+      if (!cfg.agents || typeof cfg.agents !== 'object') cfg.agents = {};
+      if (!cfg.agents.defaults || typeof cfg.agents.defaults !== 'object') cfg.agents.defaults = {};
+      if (!cfg.agents.defaults.models || typeof cfg.agents.defaults.models !== 'object') cfg.agents.defaults.models = {};
+      Object.assign(cfg.agents.defaults.models, Object.fromEntries(
+        models.map((m) => [providerId + '/' + m.id, {}]),
+      ));
+    }
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+    process.stdout.write(String(models.length));
+  " "$HOME/.openclaw/openclaw.json" "openrouter" "$([ -z "${OPENCLAW_AGENT_MODELS_JSON:-}" ] && [ -z "${OPENCLAW_AGENTS_JSON:-}" ] && echo true || echo false)"); then
+    echo "  Discovered $model_count models from OpenRouter"
+    echo "Models injected into config"
+    if [ -z "${OPENCLAW_AGENT_MODELS_JSON:-}" ] && [ -z "${OPENCLAW_AGENTS_JSON:-}" ]; then
+      agent_model_count=$(node -e "
+        const fs = require('fs');
+        const cfg = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+        const models = ((((cfg || {}).agents || {}).defaults || {}).models);
+        process.stdout.write(String(models && typeof models === 'object' ? Object.keys(models).length : 0));
+      " "$HOME/.openclaw/openclaw.json")
+      echo "  Agent model options synchronized from all providers ($agent_model_count entries total)"
+    fi
+  else
+    echo "WARN: Could not discover OpenRouter models (continuing with configured/default list)" >&2
+  fi
+fi
+
+if [ -n "$ANTHROPIC_API_KEY" ] && [ -z "$OPENCLAW_ANTHROPIC_MODELS_JSON" ]; then
+  echo "==== Discovering Anthropic Models ===="
+  if model_count=$(curl -sf \
+    -H "x-api-key: $ANTHROPIC_API_KEY" \
+    -H "anthropic-version: 2023-06-01" \
+    "https://api.anthropic.com/v1/models" 2>/dev/null | node -e "
+    const fs = require('fs');
+    const cfgPath = process.argv[1];
+    const providerId = process.argv[2];
+    const syncDiscoveredToAgentList = process.argv[3] === 'true';
+    const raw = fs.readFileSync(0, 'utf8');
+    if (!raw || !raw.trim()) process.exit(2);
+    const data = JSON.parse(raw);
+    const rows = Array.isArray(data?.data) ? data.data : [];
+    const models = rows
+      .filter((m) => m && typeof m.id === 'string')
+      .map((m) => ({ id: m.id, name: typeof m.display_name === 'string' && m.display_name.length > 0 ? m.display_name : m.id }));
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    if (!cfg.models || typeof cfg.models !== 'object') cfg.models = {};
+    if (!cfg.models.providers || typeof cfg.models.providers !== 'object') cfg.models.providers = {};
+    if (!cfg.models.providers[providerId] || typeof cfg.models.providers[providerId] !== 'object') {
+      cfg.models.providers[providerId] = {};
+    }
+    cfg.models.providers[providerId].models = models;
+    if (syncDiscoveredToAgentList) {
+      if (!cfg.agents || typeof cfg.agents !== 'object') cfg.agents = {};
+      if (!cfg.agents.defaults || typeof cfg.agents.defaults !== 'object') cfg.agents.defaults = {};
+      if (!cfg.agents.defaults.models || typeof cfg.agents.defaults.models !== 'object') cfg.agents.defaults.models = {};
+      Object.assign(cfg.agents.defaults.models, Object.fromEntries(
+        models.map((m) => [providerId + '/' + m.id, {}]),
+      ));
+    }
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+    process.stdout.write(String(models.length));
+  " "$HOME/.openclaw/openclaw.json" "anthropic" "$([ -z "${OPENCLAW_AGENT_MODELS_JSON:-}" ] && [ -z "${OPENCLAW_AGENTS_JSON:-}" ] && echo true || echo false)"); then
+    echo "  Discovered $model_count models from Anthropic"
+    echo "Models injected into config"
+  else
+    echo "WARN: Could not discover Anthropic models (continuing with configured/default list)" >&2
+  fi
+fi
+
+if [ -n "$GEMINI_API_KEY" ] && [ -z "$OPENCLAW_GEMINI_MODELS_JSON" ]; then
+  echo "==== Discovering Google Gemini Models ===="
+  if model_count=$(curl -sf \
+    "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" 2>/dev/null | node -e "
+    const fs = require('fs');
+    const cfgPath = process.argv[1];
+    const providerId = process.argv[2];
+    const syncDiscoveredToAgentList = process.argv[3] === 'true';
+    const raw = fs.readFileSync(0, 'utf8');
+    if (!raw || !raw.trim()) process.exit(2);
+    const data = JSON.parse(raw);
+    const rows = Array.isArray(data?.models) ? data.models : [];
+    const models = rows
+      .filter((m) => m && typeof m.name === 'string' && m.name.startsWith('models/'))
+      .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+      .map((m) => {
+        const id = m.name.replace(/^models\//, '');
+        const name = typeof m.displayName === 'string' && m.displayName.length > 0 ? m.displayName : id;
+        return { id, name };
+      });
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    if (!cfg.models || typeof cfg.models !== 'object') cfg.models = {};
+    if (!cfg.models.providers || typeof cfg.models.providers !== 'object') cfg.models.providers = {};
+    if (!cfg.models.providers[providerId] || typeof cfg.models.providers[providerId] !== 'object') {
+      cfg.models.providers[providerId] = {};
+    }
+    cfg.models.providers[providerId].models = models;
+    if (syncDiscoveredToAgentList) {
+      if (!cfg.agents || typeof cfg.agents !== 'object') cfg.agents = {};
+      if (!cfg.agents.defaults || typeof cfg.agents.defaults !== 'object') cfg.agents.defaults = {};
+      if (!cfg.agents.defaults.models || typeof cfg.agents.defaults.models !== 'object') cfg.agents.defaults.models = {};
+      Object.assign(cfg.agents.defaults.models, Object.fromEntries(
+        models.map((m) => [providerId + '/' + m.id, {}]),
+      ));
+    }
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+    process.stdout.write(String(models.length));
+  " "$HOME/.openclaw/openclaw.json" "google" "$([ -z "${OPENCLAW_AGENT_MODELS_JSON:-}" ] && [ -z "${OPENCLAW_AGENTS_JSON:-}" ] && echo true || echo false)"); then
+    echo "  Discovered $model_count models from Google Gemini"
+    echo "Models injected into config"
+  else
+    echo "WARN: Could not discover Google Gemini models (continuing with configured/default list)" >&2
   fi
 fi
 
