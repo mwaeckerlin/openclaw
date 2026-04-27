@@ -12,6 +12,7 @@ ARG CONFIGURATION_COMMANDS=" \
   "
 
 FROM mwaeckerlin/openclaw-mcp-gateway AS mcp_gateway_skills
+FROM mwaeckerlin/mcp-github AS mcp_github_skills
 
 FROM mwaeckerlin/ubuntu-base AS build
 ENV CONTAINERNAME    "openclaw"
@@ -79,6 +80,7 @@ RUN ( \
 RUN install -d -m 700 -o ${RUN_USER} -g ${RUN_GROUP} ${RUN_HOME}/.ssh
 ADD files/SKILL.md /opt/openclaw/skills/ssh-sandbox/SKILL.md
 COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway/SKILL.md /opt/openclaw/skills/openclaw-mcp-gateway/SKILL.md
+COPY --from=mcp_github_skills /app/skills/mcp-github/SKILL.md /opt/openclaw/skills/mcp-github/SKILL.md
 ADD files/sandbox-entrypoint.sh /entrypoint.sh
 EXPOSE 22
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=60 \

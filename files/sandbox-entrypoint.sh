@@ -24,6 +24,10 @@ if [ -n "${OPENCLAW_MCP_GATEWAY_URL}" ]; then
   echo "==== Setting MCP Gateway URL ===="
   echo "OPENCLAW_MCP_GATEWAY_URL=${OPENCLAW_MCP_GATEWAY_URL}" >> /etc/environment
 fi
+if [ -n "${MCP_GITHUB_URL}" ]; then
+  echo "==== Setting MCP GitHub URL ===="
+  echo "MCP_GITHUB_URL=${MCP_GITHUB_URL}" >> /etc/environment
+fi
 chown -R ${RUN_USER}:${RUN_GROUP} ${RUN_HOME}
 chmod 700 ${RUN_HOME}/.ssh
 chmod 600 ${RUN_HOME}/.ssh/authorized_keys
