@@ -44,7 +44,7 @@ ENV PACKAGES_UTILS=" \
   curl wget nmap iputils-ping iproute2 netcat-openbsd dnsutils \
   openssh-client rsync jq yq ripgrep fd-find bat fzf just htop \
   zip unzip xz-utils bzip2 procps ca-certificates gnupg apt-transport-https \
-  locales pwgen chromium-browser \
+  locales pwgen chromium-browser xdg-utils w3m \
   "
 ENV PACKAGES_DB=" \
   postgresql-client redis-tools default-mysql-client sqlite3 \

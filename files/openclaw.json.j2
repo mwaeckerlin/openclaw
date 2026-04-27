@@ -136,7 +136,7 @@
       "criticalThreshold": {{ OPENCLAW_LOOP_DETECTION_CRITICAL_THRESHOLD | default('5', true) | int }},
       "globalCircuitBreakerThreshold": {{ OPENCLAW_LOOP_DETECTION_GLOBAL_CIRCUIT_BREAKER_THRESHOLD | default('10', true) | int }}
     },
-{% if OPENAI_API_KEY | default('') | length > 0 %}
+{% if OPENCLAW_WHISPER_API_KEY | default('') | length > 0 or OPENAI_API_KEY | default('') | length > 0 %}
     "media": {
       "audio": {
         "enabled": {{ OPENCLAW_MEDIA_AUDIO_ENABLED | default('true', true) }},
@@ -503,7 +503,11 @@
         "apiKey": "${OPENCLAW_NOTION_API_KEY}"
       },
 {% endif %}
-{% if OPENAI_API_KEY | default('') | length > 0 %}
+{% if OPENCLAW_WHISPER_API_KEY | default('') | length > 0 %}
+      "openai-whisper-api": {
+        "apiKey": "${OPENCLAW_WHISPER_API_KEY}"
+      },
+{% elif OPENAI_API_KEY | default('') | length > 0 %}
       "openai-whisper-api": {
         "apiKey": "${OPENAI_API_KEY}"
       },
