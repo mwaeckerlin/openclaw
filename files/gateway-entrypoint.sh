@@ -57,8 +57,14 @@ normalize_provider_models() {
 normalize_provider_models ~/.openclaw/openclaw.json.rendered
 
 echo "==== Configuring OpenClaw ===="
-if [ -n "$OVERWRITE_CONFIG" ] || [ ! -e ~/.openclaw/openclaw.json ]; then
+# Unset/true overwrites openclaw.json from the template on startup.
+# Set OVERWRITE_CONFIG=false to preserve manual edits in the persistent volume.
+_overwrite_config="${OVERWRITE_CONFIG:-true}"
+if [ "$_overwrite_config" = "true" ] || [ "$_overwrite_config" = "1" ] || [ "$_overwrite_config" = "yes" ] || [ "$_overwrite_config" = "on" ] || [ ! -e ~/.openclaw/openclaw.json ]; then
   cp ~/.openclaw/openclaw.json.rendered ~/.openclaw/openclaw.json
+  echo "openclaw.json written"
+else
+  echo "openclaw.json preserved (OVERWRITE_CONFIG=false)"
 fi
 normalize_provider_models ~/.openclaw/openclaw.json
 
