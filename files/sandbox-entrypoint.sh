@@ -11,10 +11,14 @@ echo "==== Installing Skills to Existing Workspaces ===="
 for workspace_skills in "${RUN_HOME}/workspaces" "${RUN_HOME}"/workspaces/*/workspace; do
   [ -d "$workspace_skills" ] || continue
   [ -d "$workspace_skills"/skills ] || mkdir -p "$workspace_skills"/skills
-  for source_file in /app/skills/*/SKILL.md; do
-    [ -f "$source_file" ] || continue
-    skill_name="$(basename "$(dirname "$source_file")")"
-    install -D -m 644 -o "${RUN_USER}" -g "${RUN_GROUP}" "$source_file" "${workspace_skills}/skills/${skill_name}/SKILL.md"
+  for source_dir in /app/skills/*; do
+    [ -d "$source_dir" ] || continue
+    skill_name="$(basename "$source_dir")"
+    target_dir="${workspace_skills}/skills/${skill_name}"
+    rm -rf "$target_dir"
+    mkdir -p "$target_dir"
+    cp -a "$source_dir"/. "$target_dir"/
+    chown -R "${RUN_USER}:${RUN_GROUP}" "$target_dir"
   done
 done
 if [ -n "${DOCKER_HOST}" ]; then
