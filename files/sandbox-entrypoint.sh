@@ -8,12 +8,13 @@ fi
 [ -d ${RUN_HOME}/.ssh ] || mkdir -p ${RUN_HOME}/.ssh
 echo "$key" > ${RUN_HOME}/.ssh/authorized_keys
 echo "==== Installing Skills to Existing Workspaces ===="
-for workspace_skills in "${RUN_HOME}"/workspaces/*/skills; do
+for workspace_skills in "${RUN_HOME}/workspaces" "${RUN_HOME}"/workspaces/*/workspace; do
   [ -d "$workspace_skills" ] || continue
-  for source_file in /opt/openclaw/skills/*/SKILL.md; do
+  [ -d "$workspace_skills"/skills ] || mkdir -p "$workspace_skills"/skills
+  for source_file in /app/skills/*/SKILL.md; do
     [ -f "$source_file" ] || continue
     skill_name="$(basename "$(dirname "$source_file")")"
-    install -D -m 644 -o "${RUN_USER}" -g "${RUN_GROUP}" "$source_file" "${workspace_skills}/${skill_name}/SKILL.md"
+    install -D -m 644 -o "${RUN_USER}" -g "${RUN_GROUP}" "$source_file" "${workspace_skills}/skills/${skill_name}/SKILL.md"
   done
 done
 if [ -n "${DOCKER_HOST}" ]; then
