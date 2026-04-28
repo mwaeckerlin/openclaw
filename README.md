@@ -236,7 +236,7 @@ This means *any* Docker Secret is automatically available as an environment vari
 
 ### LiteLLM Configuration
 
-When `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the default model switches to `litellm/openrouter/anthropic/claude-sonnet-4`. Without it, OpenAI is used directly with `openai/gpt-4o` as default.
+When `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the default model switches to `litellm/openrouter/~moonshotai/kimi-latest`. Without LiteLLM, OpenClaw uses `openrouter/~moonshotai/kimi-latest` when `OPENROUTER_API_KEY` is set, otherwise `openai/gpt-4.6`.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -253,7 +253,7 @@ When configured, model lists are discovered dynamically from providers:
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENCLAW_PRIMARY_MODEL` | _(auto)_ | Default LLM model; auto-selects `litellm/openrouter/anthropic/claude-sonnet-4` if LiteLLM is configured, else `openai/gpt-4o` |
+| `OPENCLAW_PRIMARY_MODEL` | _(auto)_ | Default LLM model; auto-selects `litellm/openrouter/~moonshotai/kimi-latest` with LiteLLM, `openrouter/~moonshotai/kimi-latest` with OpenRouter, else `openai/gpt-4.6` |
 | `OPENCLAW_HEARTBEAT_INTERVAL` | `0s` | Duration for agent heartbeat (e.g. `30m`, `2h`, `0s` = disabled) |
 | `OPENCLAW_TIMEOUT_SECONDS` | `300` | Agent execution timeout in seconds |
 | `OPENCLAW_MAX_CONCURRENT` | `5` | Maximum concurrent agents |

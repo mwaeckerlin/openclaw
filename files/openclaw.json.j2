@@ -127,15 +127,15 @@
 {% if OPENCLAW_PRIMARY_MODEL | default('') | length > 0 %}
         "primary": "{{ OPENCLAW_PRIMARY_MODEL }}"
 {% elif LITELLM_MASTER_KEY | default('') | length > 0 %}
-        "primary": "litellm/openrouter/anthropic/claude-sonnet-4"
+  "primary": "litellm/openrouter/~moonshotai/kimi-latest"
 {% elif OPENROUTER_API_KEY | default('') | length > 0 %}
-        "primary": "openrouter/anthropic/claude-sonnet-4"
+  "primary": "openrouter/~moonshotai/kimi-latest"
 {% elif OPENAI_API_KEY | default('') | length > 0 %}
-        "primary": "openai/gpt-4o"
+  "primary": "openai/gpt-4.6"
 {% elif ANTHROPIC_API_KEY | default('') | length > 0 %}
-        "primary": "anthropic/claude-sonnet-4-5"
+  "primary": "anthropic/claude-opus-4.6"
 {% elif GEMINI_API_KEY | default('') | length > 0 or GOOGLE_API_KEY | default('') | length > 0 %}
-        "primary": "google/gemini-2.5-pro"
+        "primary": "google/gemini-3.1-pro-preview"
 {% endif %}
       },
 {% if OPENCLAW_AGENT_MODELS_JSON | default('') | length > 0 %}
