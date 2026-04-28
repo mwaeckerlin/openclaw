@@ -60,6 +60,7 @@ The primary security mechanism is **strict isolation**: The AI runs in a dedicat
 - **Docker-in-Docker isolation** — If yo uwant to allow the agent to run docker commands, you may attach a dedicated Docker container (`docker:dind`) where the agent can run docker in an isolated installation, seggregated from your docker installation. Be aware that the agent can gain root, but only in tis isolated container. Just restart the container to restore in case of a break out. No data is in danger.
 - **OpenClaw-MCP-Gateway** — The project [mwaeckerlin/openclaw-mcp-gateway](https://github.com/mwaeckerlin/openclaw-mcp-gateway) runs an MCP server to give the sandbox limited access to the gateway to execute some safe `openclaw` CLI commands. It helps for self analysis and allows to setup cron jobs. Only the MCP server holds the gateway token, the sandbox has no access to the token.
 - **MCP-Github** — The project [mwaeckerlin/mcp-github](https://github.com/mwaeckerlin/mcp-github) gives the sandbox access to the GitHub API. Only the MCP server holds the GitHub token, the sandbox has no access to the token.
+- **MCP-Gitea** — The [gitea/gitea-mcp](https://gitea.com/gitea/gitea-mcp) server gives the sandbox access to a self-hosted Gitea instance. Only the MCP server holds the Gitea access token, the sandbox has no access to the token. Set `OPENCLAW_GITEA_TOKEN` and `OPENCLAW_GITEA_HOST` to enable.
 
 ### Hardened OpenClaw Setup
 
@@ -111,6 +112,10 @@ cloud docker {
     [Github-Gateway] as gh
   }
 
+  node "gitea/gitea-mcp" {
+    [Gitea-Gateway] as gt
+  }
+
   component "allow-write-access" as aw
 }
 
@@ -121,7 +126,9 @@ mcp --up--> ctrl : forward\ncommands
 sshd -left-> dd : docker
 aw .up.> cfg : chown
 sshd --> gh
-gh ----> [GitHib]
+gh ----> [GitHub]
+sshd --> gt
+gt ----> [Gitea]
 @enduml
 ```
 
@@ -212,9 +219,10 @@ This means *any* Docker Secret is automatically available as an environment vari
 | `OPENCLAW_NOTION_API_KEY` | — | Notion API key; enables Notion skill |
 | `OPENCLAW_GITHUB_TOKEN` | — | GitHub personal access token; enables GitHub MCP server via ACPX (token stays gateway-side, sandbox only sees MCP tools) |
 | `MCP_GITHUB_URL` | no (compose default) | MCP GitHub endpoint used from the sandbox. Default in this setup: `http://mcp-github:4000`. This value is written to `/etc/environment` by the sandbox entrypoint so the non-root SSH user can read it. |
-| `OPENCLAW_GITEA_HOST` | — | Gitea host URL for ACPX MCP server setup |
-| `OPENCLAW_GITEA_TOKEN` | — | Gitea personal access token; enables Gitea MCP server via ACPX |
-| `OPENCLAW_GITEA_INSECURE` | — | Optional Gitea MCP setting (`GITEA_INSECURE`) |
+| `OPENCLAW_GITEA_HOST` | — | Gitea host URL (e.g. `https://gitea.example.com`); required to enable Gitea MCP server integration |
+| `OPENCLAW_GITEA_TOKEN` | — | Gitea personal access token; enables Gitea MCP server (token stays in the mcp-gitea container, sandbox only sees MCP tools) |
+| `OPENCLAW_GITEA_INSECURE` | — | Set to `true` to skip TLS verification for the Gitea connection (optional, not recommended for production) |
+| `MCP_GITEA_URL` | no (compose default) | MCP Gitea endpoint used from the sandbox. Default in this setup: `http://mcp-gitea:8080`. This value is written to `/etc/environment` by the sandbox entrypoint so the non-root SSH user can read it. |
 | `OPENCLAW_TRELLO_API_KEY` | — | Trello API key; enables Trello skill |
 | `OPENCLAW_TELEGRAM_BOT_TOKEN` | — | Telegram bot token; enables Telegram channel |
 | `OPENCLAW_DISCORD_BOT_TOKEN` | — | Discord bot token; enables Discord channel |
