@@ -79,7 +79,7 @@ RUN ( \
   ) > /etc/installed-ubuntu-packages
 RUN install -d -m 700 -o ${RUN_USER} -g ${RUN_GROUP} ${RUN_HOME}/.ssh
 ADD https://github.com/mwaeckerlin/ai-agent-skills.git#master:skills /app/skills/
-ADD files/SKILL.md /app/skills/ssh-sandbox/SKILL.mdCOPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/
+COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/
 COPY --from=mcp_github_skills /app/skills/mcp-github /app/skills/
 ADD files/sandbox-entrypoint.sh /entrypoint.sh
 EXPOSE 22
