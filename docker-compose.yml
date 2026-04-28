@@ -231,6 +231,7 @@ services:
       DOCKER_HOST: tcp://openclaw-dind:2375
       OPENCLAW_MCP_GATEWAY_URL: http://openclaw-mcp-gateway:4000
       MCP_GITHUB_URL: http://mcp-github:4000
+      MCP_GITEA_URL: http://mcp-gitea:8080
     volumes:
       - openclaw-workspace:/home/somebody
     security_opt:
@@ -241,12 +242,15 @@ services:
         condition: service_started
       mcp-github:
         condition: service_started
+      mcp-gitea:
+        condition: service_started
     restart: unless-stopped
     networks:
       - gateway-sandbox
       - sandbox-dind
       - sandbox-mcp-gateway
       - sandbox-mcp-github
+      - sandbox-mcp-gitea
 
   openclaw-dind:
     image: docker:dind
@@ -285,6 +289,18 @@ services:
     networks:
       - sandbox-mcp-github
 
+  mcp-gitea:
+    image: gitea/gitea-mcp:latest
+    command: ["-t", "sse", "--host", "${OPENCLAW_GITEA_HOST:-https://gitea.com}"]
+    environment:
+      GITEA_ACCESS_TOKEN: ${OPENCLAW_GITEA_TOKEN:-}
+      GITEA_INSECURE: ${OPENCLAW_GITEA_INSECURE:-}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - sandbox-mcp-gitea
+
   allow-write-access:
     image: mwaeckerlin/allow-write-access
     environment:
@@ -298,6 +314,7 @@ networks:
   gateway-mcp-gateway:
   sandbox-mcp-gateway:
   sandbox-mcp-github:
+  sandbox-mcp-gitea:
 
 volumes:
   openclaw-config:
