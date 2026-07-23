@@ -70,14 +70,14 @@ Do not assume:
 
 ## MCP Gateway Skill Presence
 
-This deployment variant packages skills in sandbox image under `/opt/openclaw/skills` and copies them at sandbox startup into all existing workspace skill directories:
+This deployment variant packages skills in sandbox image under `/app/skills` and copies them at sandbox startup into all existing workspace skill directories:
 
 - `~/workspaces/*/skills/<skill-name>/SKILL.md`
 
 Packaged sources:
 
-- `/opt/openclaw/skills/openclaw-mcp-gateway/SKILL.md`
-- `/opt/openclaw/skills/ssh-sandbox/SKILL.md`
+- `/app/skills/openclaw-mcp-gateway/SKILL.md`
+- `/app/skills/ssh-sandbox/SKILL.md`
 
 Verify installed copies:
 

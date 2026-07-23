@@ -21,6 +21,9 @@ for workspace_skills in "${RUN_HOME}/workspaces" "${RUN_HOME}"/workspaces/*/work
     chown -R "${RUN_USER}:${RUN_GROUP}" "$target_dir"
   done
 done
+# rewrite /etc/environment from scratch: appending would accumulate duplicates
+# across container restarts (the file is created empty at build time)
+: > /etc/environment
 if [ -n "${DOCKER_HOST}" ]; then
   echo "==== Enabling Docker Host ===="
   echo "DOCKER_HOST=${DOCKER_HOST}" >> /etc/environment

@@ -47,7 +47,7 @@ The primary security mechanism is **strict isolation**: The AI runs in a dedicat
 
 - **Network isolation** — Containers communicate on seggregated internal networks. Every two containers have their own network.
 - **Network Encryption** (production) — When going to production, *encrypt the networks* (e.g. encrypted overlay in docker swarm: for all networks set `networks.<network>.driver_opts.encrypted: "true"`, or add a service mesh)
-- **No port over-exposure** — Only port 18789 (UI/API) is published for *local testing only*; internal ports stay internal. If you attach chat tool, such as [Telegram](https://telegram.org/), you can even close that port. You can then reach your OpenClaw through Telegram. *Do not expose 18789 to the Internet without further protection.* You may add e.g. [Traefik](https://doc.traefik.io/traefik/) service and an [Authentik proxy-provider outpost](https://docs.goauthentik.io/add-secure-apps/outposts) in front of OpenClaw when you want to access it through the internet.
+- **No port over-exposure** — Only port 18789 (UI/API) is published, bound to `127.0.0.1` by default (override with `OPENCLAW_GATEWAY_BIND_ADDRESS`) for *local testing only*; internal ports stay internal. If you attach chat tool, such as [Telegram](https://telegram.org/), you can even close that port. You can then reach your OpenClaw through Telegram. *Do not expose 18789 to the Internet without further protection.* You may add e.g. [Traefik](https://doc.traefik.io/traefik/) service and an [Authentik proxy-provider outpost](https://docs.goauthentik.io/add-secure-apps/outposts) in front of OpenClaw when you want to access it through the internet.
 
 **Note:** If networks are neither seggregated nor encrypted, the agent can *sniff for secrets* on the shared or unencrypted network. So network isolation is crucial, and encryption is highly recommended at least in production.
 
@@ -70,6 +70,15 @@ The primary security mechanism is **strict isolation**: The AI runs in a dedicat
 ### `strictHostKeyChecking: false`
 
 Acceptable in a controlled internal Docker network where DNS is managed by Docker. For production hardening, consider pinning host keys.
+
+### Documented Security Trade-offs
+
+These defaults trade security for local out-of-the-box usability. All are overridable via environment variables; review them before any non-local deployment:
+
+- **Control UI relaxations** — `allowInsecureAuth`, `dangerouslyAllowHostHeaderOriginFallback` and `dangerouslyDisableDeviceAuth` default to `true` (`OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH`, `OPENCLAW_CONTROL_UI_ALLOW_HOST_HEADER_ORIGIN_FALLBACK`, `OPENCLAW_CONTROL_UI_DISABLE_DEVICE_AUTH`). This lets the token-auth UI work over plain HTTP on loopback without device pairing. Behind a public reverse proxy, set all three to `false` and configure `OPENCLAW_ALLOWED_ORIGINS_JSON`.
+- **ACPX `permissionMode: approve-all`** — the gateway-side GitHub/Gitea MCP servers auto-approve all tool calls; the effective permission boundary is the scope of the token you provide (`OPENCLAW_GITHUB_TOKEN`/`OPENCLAW_GITEA_TOKEN`). Use minimal-scope tokens.
+- **Chat channel policies** — all channels default to `dmPolicy: pairing` (unknown peers must be approved before the agent reacts); Telegram groups require an explicit mention by default. Loosening this (e.g. `OPENCLAW_TELEGRAM_DM_POLICY=open`) means anyone who finds your bot can drive the agent.
+- **DinD without TLS** (`DOCKER_TLS_CERTDIR: ""`) — the isolated Docker daemon listens unauthenticated, but only on the segregated `sandbox-dind` network where the sandbox is root-equivalent by design (see the DinD security warning below).
 
 ## Full Architecture
 
@@ -136,15 +145,18 @@ For local testing with `docker compose` and `.env` file.
 Simplest use is with an [OpenAI token](https://platform.openai.com/api-keys) that you store in `OPENAI_API_KEY`. All other secrets can just be randomly generated:
 
 ```bash
-ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
-cat > .env <<EOF
+(umask 077
+  ssh-keygen -t ed25519 -f openclaw-key -N "" -C "openclaw-sandbox"
+  cat > .env <<EOF
 OPENCLAW_GATEWAY_TOKEN=$(pwgen 40 1)
 OPENCLAW_SANDBOX_SSH_PUBLIC_KEY=$(cat openclaw-key.pub)
 OPENCLAW_SANDBOX_SSH_PRIVATE_KEY=$(sed -z 's/\n/\\n/g' openclaw-key)
 OPENAI_API_KEY=sk-...[PLACE-TOKEN-HERE]
 EOF
-rm openclaw-key openclaw-key.pub
+  rm openclaw-key openclaw-key.pub)
 ```
+
+The `umask 077` keeps `.env` readable only by you — it contains all secrets.
 
 ### 2. Generate MCP Gateway Device Pairing
 
@@ -172,7 +184,15 @@ npm run start:daemon
 
 Control UI: `http://localhost:18789/`
 
-**This is for local / trusted-network use only.** The gateway token is transmitted unencrypted. Do not expose port 18789 to the internet without a TLS reverse proxy.
+**This is for local / trusted-network use only.** The gateway token is transmitted unencrypted. The port is bound to `127.0.0.1` by default; do not expose it to the internet without a TLS reverse proxy.
+
+### 4. Test
+
+```bash
+npm test
+```
+
+Runs the unit tests for the configuration renderer (secret escaping, template defaults). Requires `npm install` once for the dev dependencies.
 
 ## Full Configuration Guide
 
@@ -186,7 +206,7 @@ The gateway entrypoint iterates over all files in `/run/secrets/` and exports ea
 | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` | `openclaw_sandbox_ssh_private_key` | `openclaw-sandbox-ssh-private-key` |
 | … | … | … |
 
-The sandbox reads its public key directly from `/run/secrets/openai_api_key  or alternatively `/run/secrets/openai-api-key` (fallback when `OPENAI_API_KEY` is not set,`-` and `_` are interchangable).
+The sandbox reads its public key directly from `/run/secrets/openclaw_sandbox_ssh_public_key` or alternatively `/run/secrets/openclaw-sandbox-ssh-public-key` (fallback when `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` is not set, `-` and `_` are interchangable).
 
 This means *any* Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables.
 
@@ -207,7 +227,10 @@ This means *any* Docker Secret is automatically available as an environment vari
 | `OVERWRITE_CONFIG` | no | Unset/true overwrites `openclaw.json` from the template on startup; set `false` to preserve manual edits |
 | `OPENCLAW_CONFIG_DIR` | no | Host path for config (default: Docker volume) |
 | `OPENCLAW_STATE_DIR` | no | OpenClaw state directory path inside the gateway container (defaults to `~/.openclaw`) |
-| `OPENCLAW_GATEWAY_PORT` | no | Gateway port (default: 18789) |
+| `OPENCLAW_GATEWAY_PORT` | no | Published host port of the gateway (default: 18789) |
+| `OPENCLAW_GATEWAY_BIND_ADDRESS` | no | Host address the gateway port is published on; default `127.0.0.1` (loopback only). Trade-off: the Control UI uses plain HTTP token auth, so the port is not exposed beyond the local machine by default — set `0.0.0.0` explicitly for LAN access, and put a TLS reverse proxy in front for anything non-local |
+| `GITHUB_TOKEN` | no | GitHub token for the separate `mcp-github` service (sandbox-side MCP); independent from `OPENCLAW_GITHUB_TOKEN`, which enables the gateway-side ACPX GitHub MCP server |
+| `OPENCLAW_LOGGING_LEVEL` | no | Gateway log level (default: `info`). Trade-off: `debug` logs request details and may leak sensitive data into logs — use it only temporarily for diagnosis |
 | `OPENCLAW_ELEVENLABS_API_KEY` | — | ElevenLabs API key; enables TTS via ElevenLabs (else Microsoft TTS) |
 | `OPENCLAW_NOTION_API_KEY` | — | Notion API key; enables Notion skill |
 | `OPENCLAW_GITHUB_TOKEN` | — | GitHub personal access token; enables GitHub MCP server via ACPX (token stays gateway-side, sandbox only sees MCP tools) |

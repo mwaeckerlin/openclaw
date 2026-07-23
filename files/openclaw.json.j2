@@ -15,7 +15,7 @@
   "logging": {{ OPENCLAW_LOGGING_JSON }},
 {% else %}
   "logging": {
-    "level": "{{ OPENCLAW_LOGGING_LEVEL | default('debug', true) }}"
+    "level": "{{ OPENCLAW_LOGGING_LEVEL | default('info', true) }}"
   },
 {% endif %}
 {% if OPENCLAW_CLI_JSON | default('') | length > 0 %}
@@ -54,14 +54,6 @@
   "models": {
     "mode": "{{ OPENCLAW_MODELS_MODE | default('replace', true) }}",
     "providers": {
-{% if LITELLM_MASTER_KEY | default('') | length > 0 %}
-      "litellm": {
-        "baseUrl": "{{ LITELLM_BASE_URL | default('http://litellm:4000', true) }}",
-        "api": "{{ OPENCLAW_LITELLM_API | default('openai-completions', true) }}",
-        "apiKey": "${LITELLM_MASTER_KEY}",
-        "models": {{ OPENCLAW_LITELLM_MODELS_JSON | default('[]', true) }}
-      },
-{% endif %}
 {% if LITELLM_MASTER_KEY | default('') | length > 0 %}
       "litellm": {
         "baseUrl": "{{ LITELLM_BASE_URL | default('http://litellm:4000', true) }}",
@@ -321,10 +313,10 @@
   "channels_telegram": {
     "telegram": {
       "enabled": true,
-      "dmPolicy": "{{ OPENCLAW_TELEGRAM_DM_POLICY | default('open', true) }}",
+      "dmPolicy": "{{ OPENCLAW_TELEGRAM_DM_POLICY | default('pairing', true) }}",
       "allowFrom": {{ OPENCLAW_TELEGRAM_ALLOW_FROM_JSON | default('["*"]', true) }},
       "botToken": "${OPENCLAW_TELEGRAM_BOT_TOKEN}",
-      "groups": {{ OPENCLAW_TELEGRAM_GROUPS_JSON | default('{"*": {"requireMention": false}}', true) }},
+      "groups": {{ OPENCLAW_TELEGRAM_GROUPS_JSON | default('{"*": {"requireMention": true}}', true) }},
       "groupPolicy": "{{ OPENCLAW_TELEGRAM_GROUP_POLICY | default('allowlist', true) }}",
       "streaming": {
         "mode": "{{ OPENCLAW_TELEGRAM_STREAMING_MODE | default('partial', true) }}"

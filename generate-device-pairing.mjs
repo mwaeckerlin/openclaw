@@ -17,7 +17,7 @@
  */
 
 import { createHash, generateKeyPairSync, randomBytes } from "node:crypto";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, chmodSync } from "node:fs";
 
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 
@@ -71,5 +71,6 @@ if (process.argv.includes("--stdout")) {
     ""
   ].join("\n");
   appendFileSync(".env", lines, { mode: 0o600 });
+  chmodSync(".env", 0o600); // mode above only applies on creation; .env holds secrets
   console.log(`Device pairing appended to .env (deviceId=${deviceId.slice(0, 16)}…)`);
 }

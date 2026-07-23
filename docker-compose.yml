@@ -4,6 +4,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.gateway
+      # always try to pull newer base images: security patches in the rolling
+      # "latest" bases (e.g. upstream OpenClaw CVE fixes) must reach rebuilds
+      pull: true
     depends_on:
       openclaw-sandbox:
         condition: service_healthy
@@ -212,7 +215,9 @@ services:
     volumes:
       - openclaw-config:/home/node/.openclaw
     ports:
-      - "18789:18789"
+      # bound to loopback by default: the token-auth UI is for local testing only,
+      # set OPENCLAW_GATEWAY_BIND_ADDRESS=0.0.0.0 to expose on the LAN (see README)
+      - "${OPENCLAW_GATEWAY_BIND_ADDRESS:-127.0.0.1}:${OPENCLAW_GATEWAY_PORT:-18789}:18789"
     init: true
     security_opt:
       - no-new-privileges:true
@@ -226,6 +231,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.sandbox
+      pull: true
     environment:
       OPENCLAW_SANDBOX_SSH_PUBLIC_KEY:
       DOCKER_HOST: tcp://openclaw-dind:2375
