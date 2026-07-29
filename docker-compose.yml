@@ -231,7 +231,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.sandbox
-      pull: true
+      # no pull:true here (unlike the gateway): the base is the mwaeckerlin
+      # sandbox-base — a locally built image must take precedence over the
+      # hub version, per the family convention
     environment:
       OPENCLAW_SANDBOX_SSH_PUBLIC_KEY:
       DOCKER_HOST: tcp://openclaw-dind:2375
@@ -255,12 +257,18 @@ services:
       - sandbox-mcp-github
 
   openclaw-dind:
-    image: docker:dind
+    # rootless docker-in-docker (mwaeckerlin base image instead of the
+    # foreign root-daemon docker:dind): a compromise of the inner daemon
+    # yields only its unprivileged user; needs --privileged but no host
+    # configuration (see the dockindock README).
+    image: mwaeckerlin/dockindock
     privileged: true
     environment:
-      DOCKER_TLS_CERTDIR: ""
+      # plain TCP API, reachable only on the isolated sandbox-dind network
+      DOCKER_TCP_PORT: "2375"
     volumes:
-      - openclaw-docker:/var/lib/docker
+      # rootless daemon storage (DOCKER_DATA_ROOT) — inner images persist
+      - openclaw-docker:/docker-data
     restart: unless-stopped
     networks:
       - sandbox-dind

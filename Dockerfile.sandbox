@@ -1,90 +1,15 @@
-ARG PACKAGES="openssh-server docker.io docker-compose-v2"
-ARG CONFIGURATION_COMMANDS=" \
-  sed -i \
-  -e 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' \
-  -e 's/^#*KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' \
-  -e 's/^#*UsePAM.*/UsePAM yes/' \
-  -e 's/^#*PermitRootLogin.*/PermitRootLogin no/' \
-  /etc/ssh/sshd_config \
-  && mkdir -p /run/sshd \
-  && adduser \${RUN_USER} docker \
-  && install -m 700 -o \${RUN_USER} -g \${RUN_GROUP} /dev/null /etc/environment \
-  "
-
+# Everything shared between the agent sandboxes (full toolset, hardened
+# sshd, docker client) lives in mwaeckerlin/sandbox-base — this image only
+# adds the openclaw skills and its entrypoint.
 FROM mwaeckerlin/openclaw-mcp-gateway AS mcp_gateway_skills
 FROM mwaeckerlin/mcp-github AS mcp_github_skills
 
-FROM mwaeckerlin/ubuntu-base AS build
-ENV CONTAINERNAME    "openclaw"
-ENV PACKAGES_DEV=" \
-  lsb-release bash coreutils findutils grep sed gawk diffutils patch file tree \
-  git git-lfs gh \
-  build-essential make cmake ninja-build \
-  autoconf automake autotools-dev libtool pkg-config \
-  gcc g++ gdb valgrind clang clang-format shellcheck \
-  "
-ENV PACKAGES_LANG=" \
-  python-is-python3 python3 python3-pip python3-venv python3-dev black pylint \
-  php-cli php-mbstring php-xml php-curl php-zip composer \
-  nodejs npm ruby ruby-dev golang rustc cargo \
-  pipx python3-poetry \
-  "
-ENV PACKAGES_MEDIA=" \
-  graphviz plantuml pandoc \
-  ffmpeg imagemagick sox lame opus-tools \
-  gimp optipng jpegoptim webp potrace \
-  libimage-exiftool-perl mediainfo gnuplot \
-  inkscape librsvg2-bin libreoffice-core \
-  poppler-utils ghostscript qpdf \
-  tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng \
-  "
-ENV PACKAGES_LATEX=" \
-  texlive-latex-base texlive-fonts-recommended texlive-latex-extra texlive-xetex latexmk \
-  "
-ENV PACKAGES_UTILS=" \
-  curl wget nmap iputils-ping iproute2 netcat-openbsd dnsutils \
-  openssh-client rsync jq yq ripgrep fd-find bat fzf just htop \
-  zip unzip xz-utils bzip2 procps ca-certificates gnupg apt-transport-https \
-  locales pwgen chromium-browser xdg-utils w3m \
-  "
-ENV PACKAGES_DB=" \
-  postgresql-client redis-tools default-mysql-client sqlite3 \
-  "
-USER root
-RUN $PKG_INSTALL ${PACKAGES_DEV}
-RUN $PKG_INSTALL ${PACKAGES_LANG}
-RUN $PKG_INSTALL ${PACKAGES_MEDIA}
-RUN $PKG_INSTALL ${PACKAGES_LATEX}
-RUN $PKG_INSTALL ${PACKAGES_UTILS}
-RUN $PKG_INSTALL ${PACKAGES_DB}
-RUN ${PKG_CLEANUP}
-RUN ( \
-  echo "# PACKAGES_DEV"; \
-  echo ${PACKAGES_DEV} | tr ' ' '\n'; \
-  echo; \
-  echo "# PACKAGES_LANG"; \
-  echo ${PACKAGES_LANG} | tr ' ' '\n'; \
-  echo; \
-  echo "# PACKAGES_MEDIA"; \
-  echo ${PACKAGES_MEDIA} | tr ' ' '\n'; \
-  echo; \
-  echo "# PACKAGES_LATEX"; \
-  echo ${PACKAGES_LATEX} | tr ' ' '\n'; \
-  echo; \
-  echo "# PACKAGES_UTILS"; \
-  echo ${PACKAGES_UTILS} | tr ' ' '\n'; \
-  echo; \
-  echo "# PACKAGES_DB"; \
-  echo ${PACKAGES_DB} | tr ' ' '\n' \
-  ) > /etc/installed-ubuntu-packages
-RUN install -d -m 700 -o ${RUN_USER} -g ${RUN_GROUP} ${RUN_HOME}/.ssh
+FROM mwaeckerlin/sandbox-base AS build
+ENV CONTAINERNAME="openclaw"
 ADD https://github.com/mwaeckerlin/ai-agent-skills.git#master:skills /app/skills/
 COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/
 COPY --from=mcp_github_skills /app/skills/mcp-github /app/skills/
 ADD files/sandbox-entrypoint.sh /entrypoint.sh
-EXPOSE 22
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=60 \
-  CMD pgrep -x sshd >/dev/null || exit 1
 ENTRYPOINT ["/entrypoint.sh"]
 
 FROM build
