@@ -8,7 +8,8 @@
 #   1. a feature number is defined more than once in FEATURES.md,
 #   2. a feature has no test entry in TESTS.md (untested feature),
 #   3. TESTS.md references a feature number that does not exist,
-#   4. a test file contains a skip/xfail marker — tests are never skipped.
+#   4. a test file contains a skip, todo or only marker — tests are never
+#      skipped, and none runs alone.
 #
 # Usage: tests/docs-contract.sh
 
@@ -64,9 +65,9 @@ if [[ -f FEATURES.md && -f TESTS.md ]]; then
     fi
 fi
 
-SKIPS=$(grep -rnE 'pytest\.mark\.skip|skipif|xfail|pytest\.skip\(' tests/e2e --include='*.py' 2>/dev/null)
+SKIPS=$(grep -rnE '\b(test|it|describe)\.(skip|todo|only)\b|\{ *(skip|todo|only): *true' tests --include='*.mjs' 2>/dev/null)
 if [[ -n "${SKIPS}" ]]; then
-    _fail "no_skipped_tests" "skip/xfail markers found: ${SKIPS}"
+    _fail "no_skipped_tests" "skip/todo/only markers found: ${SKIPS}"
 else
     _pass "no_skipped_tests"
 fi

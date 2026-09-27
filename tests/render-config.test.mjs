@@ -77,6 +77,25 @@ test("telegram channel defaults to pairing policy with mention required", () => 
   assert.equal(config.channels.telegram.groups["*"].requireMention, true);
 });
 
+test("no proxy is trusted by default, so containers of the stack reach the gateway directly", () => {
+  // OpenClaw 2026.9 answers a client from a trusted proxy range without
+  // forwarded headers with 403 proxy_attribution_required; the private
+  // ranges cover every docker network, so the MCP gateway was refused
+  assert.deepEqual(renderDefault({}).gateway.trustedProxies, []);
+  const proxies = ["10.1.2.3/32"];
+  assert.deepEqual(renderDefault({ OPENCLAW_TRUSTED_PROXIES_JSON: JSON.stringify(proxies) }).gateway.trustedProxies, proxies);
+});
+
+test("every variable the template reads is passed to the gateway by docker-compose.yml", () => {
+  const template = readFileSync(defaultTemplate, "utf8");
+  const tags = template.match(/\{\{[^}]*\}\}|\{%[^%]*%\}|\$\{\w+\}/g).join(" ");
+  const read = new Set(tags.match(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/g));
+  const compose = readFileSync(join(projectRoot, "docker-compose.yml"), "utf8");
+  const gateway = compose.slice(compose.indexOf("openclaw-gateway:"), compose.indexOf("\n  openclaw-sandbox:"));
+  const passed = new Set(gateway.match(/^ {6}([A-Z][A-Z0-9_]+):/gm).map((line) => line.trim().slice(0, -1)));
+  assert.deepEqual([...read].filter((name) => !passed.has(name)), []);
+});
+
 test("default template renders valid config with providers and gateway token", () => {
   const config = renderDefault({
     OPENAI_API_KEY: "sk-test",
