@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-09-27 **1.1.3**
+    - The image test also runs in the pipeline: it fetches the official OpenClaw image for its comparison where the build kept it only in its build cache
+
 - 2026-09-26 **1.1.2**
     - The image is published for amd64 and arm64 under one tag, built and published automatically on every change and every week
     - The gateway now runs the current OpenClaw release: it builds on the official `openclaw/openclaw` image instead of a third-party copy that had stopped at the release of June 2026

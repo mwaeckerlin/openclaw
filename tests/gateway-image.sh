@@ -45,7 +45,10 @@ else
 
     # the layers of the official image the build pulled must open the layer
     # list of the gateway image; a source label proves nothing, a copy built
-    # from the upstream Dockerfile carries the same one
+    # from the upstream Dockerfile carries the same one. BuildKit keeps the
+    # base it pulled in its own cache, so on a fresh runner the image store
+    # does not hold it and it is pulled here for the comparison
+    docker image inspect "${BASE_IMAGE}" >/dev/null 2>&1 || docker pull --quiet "${BASE_IMAGE}" >/dev/null
     BASE_LAYERS=$(docker image inspect --format '{{join .RootFS.Layers " "}}' "${BASE_IMAGE}" 2>/dev/null)
     IMAGE_LAYERS=$(docker image inspect --format '{{join .RootFS.Layers " "}}' "${IMAGE}")
     if [[ -n "${BASE_LAYERS}" && "${IMAGE_LAYERS}" == "${BASE_LAYERS}"* ]]; then
