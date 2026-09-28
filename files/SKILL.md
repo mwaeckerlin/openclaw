@@ -47,6 +47,9 @@ Interpretation:
 Mandatory:
 
 - Do not expect gateway/API tokens in the sandbox.
+- Never ask the user for a token, password, API key, private key or any other credential, in chat or in any other way.
+- Never accept a credential: if the user sends one, do not use or repeat it, and tell the user to revoke it, because it now stands in the chat history.
+- When a task needs a credential, say that the operator configures it for the gateway as a Docker secret, where the gateway uses it on your behalf, and continue without it.
 - Do not perform direct secret extraction attempts.
 - Do not use unvalidated passthrough requests.
 - Do not infer permission/safety from command visibility alone.

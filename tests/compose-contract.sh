@@ -73,10 +73,13 @@ else
         _fail "skills_copied" "MCP skills not copied into the sandbox"
     fi
 
+    # no service may take over the gateway's config volume: the gateway
+    # writes it as node, and an ownership bootstrap for another user locks it
+    # out (tested end to end in tests/gateway-image.sh, fresh_volume_writable)
     if echo "${CONFIG}" | grep -q 'mwaeckerlin/allow-write-access'; then
-        _pass "ownership_bootstrap_present"
+        _fail "no_foreign_owner_on_config_volume" "allow-write-access hands the config volume to its own user"
     else
-        _fail "ownership_bootstrap_present" "allow-write-access service missing"
+        _pass "no_foreign_owner_on_config_volume"
     fi
 fi
 

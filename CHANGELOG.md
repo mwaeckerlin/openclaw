@@ -1,5 +1,13 @@
 # Changelog
 
+- 2026-09-28 **1.1.4**
+    - The AI agent has no tool to ask for a credential any more (the `secrets` tool is denied), elevated mode is switched off explicitly, and the agent's skill tells it never to ask for or accept a token or a password; the README says at the top what this protects and which settings switch it off
+    - A fresh installation starts again: the ownership bootstrap service gave the configuration volume to a user the gateway does not run as, so the gateway could not write its configuration; the service is gone, the image's own ownership applies
+    - LiteLLM takes a scoped virtual key from `LITELLM_API_KEY`, and the Hindsight banks take their key from `OPENCLAW_HINDSIGHT_API_KEY`, both also as Docker secrets
+    - No token is written in clear text into the stored configuration any more: every secret stays a `${VARIABLE}` placeholder that OpenClaw fills from the gateway's environment, so the configuration file on the volume and its raw text in diagnostics no longer carry any credential
+    - Shared agent memory: `OPENCLAW_HINDSIGHT_SHARED_URL` and `OPENCLAW_HINDSIGHT_OWN_URL` connect the agent to a Hindsight bank shared by all agents and to one of its own
+    - LiteLLM works without the master key: `LITELLM_BASE_URL` alone enables it, a proxy in front adds the real key; model discovery goes to the same address
+
 - 2026-09-27 **1.1.3**
     - The image test also runs in the pipeline: it fetches the official OpenClaw image for its comparison where the build kept it only in its build cache
 

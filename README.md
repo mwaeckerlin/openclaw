@@ -3,6 +3,18 @@
 
 Combine OpenClaw with Security and Easiness! Run out of the box a secure docker based sandboxed OpenClaw, locally or in a cloud.
 
+## No Token for the AI
+
+The AI agent never sees a token, a password or an API key, and it has no tool to ask you for one. Every credential stays in the gateway, which uses it on the agent's behalf; the agent works in a separate sandbox container that holds none. Each point below is enforced by the default configuration and checked by a test ([TESTS.md](TESTS.md)):
+
+- The agent's commands and file tools run in the SSH sandbox, which receives no credential; its only key is the SSH public key.
+- The agent has no tool to request a credential (`secrets` is denied), no tool that runs commands in the gateway (elevated mode is off), and no gateway, browser or web tool in its sandboxed sessions.
+- The configuration file on the volume holds `${VARIABLE}` placeholders, never a token; OpenClaw fills them from the gateway's environment.
+- LiteLLM, Hindsight and the channel integrations take their keys as Docker secrets of the gateway.
+- The MCP bridge the sandbox uses removes tokens from every answer, also from log lines, including Telegram, Slack, GitHub and Discord tokens.
+
+No configuration can stop a language model from writing a question into the chat. The agent is instructed never to ask for a credential and never to accept one; you still never send one. See [Your Part](#your-part) for this and for the settings that switch the protection off.
+
 It has never been so easy to run a *secure* sandboxed pre-configured OpenClaw:
 
 1. get an [OpenAI token](https://platform.openai.com/api-keys) (or use [LiteLLM](https://docs.litellm.ai/docs/))
@@ -75,6 +87,15 @@ Note: If networks are neither segregated nor encrypted, the agent can *sniff for
 
 Acceptable in a controlled internal Docker network where DNS is managed by Docker. For production hardening, consider pinning host keys.
 
+### Your Part
+
+The protection holds with the defaults of this image. These actions remove it, and each is your own decision:
+
+- **Sending a credential to the agent.** No language model can be prevented from asking a question in the chat, and whatever you type into a chat reaches the model and its transcript. Never send a token or a password to the agent, not even when it asks; if it happened, revoke that credential at once. Credentials belong into the gateway as Docker secrets.
+- **Overriding the tool policy.** `OPENCLAW_TOOLS_ELEVATED_ENABLED=true` lets the agent run commands in the gateway, where every token lies in the environment. `OPENCLAW_TOOLS_DENY_JSON` without `"secrets"` gives the agent the tool to request credentials. `OPENCLAW_AGENT_SANDBOX_MODE` other than `all`, `OPENCLAW_TOOLS_JSON` and `OPENCLAW_AGENTS_JSON` replace the protected defaults as a whole. The defaults are safe; every override is yours.
+- **Putting a credential into the sandbox.** Anything in the sandbox's environment, its workspace or a volume it mounts is readable by the agent. Keep secrets out of `openclaw-sandbox` and out of the workspace.
+- **Wiring the sandbox to a credentialed service.** The agent cannot read the token of an MCP server such as `mcp-github`, but it can use everything that token permits. Give every service on the sandbox's networks a token with the smallest scope that does the job.
+
 ### Documented Security Trade-offs
 
 These defaults trade security for local out-of-the-box usability. All are overridable via environment variables; review them before any non-local deployment:
@@ -124,8 +145,6 @@ cloud docker {
   node "mwaeckerlin/mcp-github" {
     [Github-Gateway] as gh
   }
-
-  component "allow-write-access" as aw
 }
 
 user --> ctrl : "HTTP"
@@ -133,7 +152,6 @@ ctrl --> sshd : "SSH"
 sshd --up--> mcp : openclaw\ncommands
 mcp --up--> ctrl : forward\ncommands
 sshd -left-> dd : docker
-aw .up.> cfg : chown
 sshd --> gh
 gh ----> [GitHub]
 @enduml
@@ -201,7 +219,7 @@ npm run build
 npm test
 ```
 
-`npm test` checks the feature and test registers, runs the unit tests of the configuration renderer (secret escaping, template defaults), checks the wiring of `docker-compose.yml`, and tests the built gateway image: for each group of environment variables, OpenClaw itself validates the rendered configuration, and the gateway has to start and answer `/healthz`. All tests are listed in [TESTS.md](TESTS.md).
+`npm test` checks the feature and test registers, runs the unit tests of the configuration renderer (secret escaping, template defaults), checks the wiring of `docker-compose.yml`, and tests the built gateway image: for each group of environment variables, OpenClaw itself validates the rendered configuration, and the gateway has to start and answer `/healthz`. Finally it starts gateway and sandbox together with test credentials and checks that the agent gets no tool to request or reach a credential and that the sandbox holds none. All tests are listed in [TESTS.md](TESTS.md).
 
 ### 5. Images and Publishing
 
@@ -224,6 +242,8 @@ The gateway entrypoint iterates over all files in `/run/secrets/` and exports ea
 The sandbox reads its public key directly from `/run/secrets/openclaw_sandbox_ssh_public_key` or alternatively `/run/secrets/openclaw-sandbox-ssh-public-key` (fallback when `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` is not set, `-` and `_` are interchangeable).
 
 This means *any* Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables.
+
+No secret value is written into `openclaw.json`: the rendered configuration keeps a placeholder such as `"botToken": "${OPENCLAW_TELEGRAM_BOT_TOKEN}"`, and OpenClaw fills it from the gateway's environment when it loads the configuration. The file on the `openclaw-config` volume, and its raw text that the gateway returns in diagnostics, therefore carries no credential.
 
 ### Core Configuration
 
@@ -272,13 +292,29 @@ This means *any* Docker Secret is automatically available as an environment vari
 
 ### LiteLLM Configuration
 
-When `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the default model switches to `litellm/openrouter/~moonshotai/kimi-latest`. Without LiteLLM, OpenClaw uses `openrouter/~moonshotai/kimi-latest` when `OPENROUTER_API_KEY` is set, otherwise `openai/gpt-4.6`.
+When `LITELLM_BASE_URL` or `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the default model switches to `litellm/openrouter/~moonshotai/kimi-latest`. Without LiteLLM, OpenClaw uses `openrouter/~moonshotai/kimi-latest` when `OPENROUTER_API_KEY` is set, otherwise `openai/gpt-4.6`.
+
+Without a key in the gateway: set only `LITELLM_BASE_URL` to a proxy in front of LiteLLM that puts the credential (a scoped virtual key) into the `Authorization` header. OpenClaw sends no provider request without some key, so the gateway sends the fixed public value `Bearer proxy-supplied`, which the proxy replaces; model discovery sends no header. The gateway container then needs no `litellm_master_key` secret.
 
 | Variable | Default | Description |
 |---|---|---|
-| `LITELLM_MASTER_KEY` | — | Bearer token for LiteLLM API authentication; enables LiteLLM provider |
-| `LITELLM_URL` | — | Base URL of LiteLLM proxy for model discovery |
-| `LITELLM_BASE_URL` | `http://litellm:4000` | Base URL for connecting to LiteLLM |
+| `LITELLM_MASTER_KEY` | — | Bearer token for LiteLLM API authentication; leave unset when a proxy adds the credential |
+| `LITELLM_API_KEY` | — | Scoped LiteLLM virtual key, e.g. as Docker secret `litellm_api_key`; takes precedence over `LITELLM_MASTER_KEY` |
+| `LITELLM_URL` | `LITELLM_BASE_URL` | Base URL of LiteLLM for model discovery |
+| `LITELLM_BASE_URL` | `http://litellm:4000` | Base URL for connecting to LiteLLM; enables the provider on its own |
+
+### Hindsight Memory
+
+[Hindsight](https://github.com/vectorize-io/hindsight) serves one MCP endpoint per memory bank, `http://<service>:8888/mcp/<bank_id>/`. The agent gets two of them as MCP servers, `hindsight-shared` and `hindsight-openclaw`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENCLAW_HINDSIGHT_SHARED_URL` | — | MCP URL of the bank all agents share |
+| `OPENCLAW_HINDSIGHT_OWN_URL` | — | MCP URL of the bank of this agent |
+| `OPENCLAW_HINDSIGHT_TRANSPORT` | `streamable-http` | MCP transport of both servers (`streamable-http` or `sse`) |
+| `OPENCLAW_HINDSIGHT_API_KEY` | — | Key the gateway sends to both banks as `Authorization: Bearer`, e.g. as Docker secret `openclaw_hindsight_api_key` |
+
+`OPENCLAW_MCP_JSON`, when set, replaces the whole `mcp` section, the Hindsight servers included.
 
 When configured, model lists are discovered dynamically from providers:
 
@@ -348,7 +384,7 @@ Most useful groups:
 
 - Models and providers: `OPENCLAW_MODELS_MODE`, `OPENCLAW_OPENAI_BASE_URL`, `OPENCLAW_OPENAI_MODELS_JSON`, `OPENCLAW_LITELLM_*`, `OPENCLAW_AGENT_MODELS_JSON`
 - Agent runtime: `OPENCLAW_AGENT_SANDBOX_MODE`, `OPENCLAW_AGENT_WORKSPACE_ACCESS`, `OPENCLAW_SUBAGENT_*`
-- Tools and media: `OPENCLAW_TOOLS_FS_WORKSPACE_ONLY`, `OPENCLAW_LOOP_DETECTION_*`, `OPENCLAW_MEDIA_AUDIO_*`, `OPENCLAW_TTS_*`
+- Tools and media: `OPENCLAW_TOOLS_DENY_JSON` (default `["secrets"]`), `OPENCLAW_TOOLS_ELEVATED_ENABLED` (default `false`), `OPENCLAW_TOOLS_FS_WORKSPACE_ONLY`, `OPENCLAW_LOOP_DETECTION_*`, `OPENCLAW_MEDIA_AUDIO_*`, `OPENCLAW_TTS_*`
 - Messaging and hooks: `OPENCLAW_MESSAGES_QUEUE_*`, `OPENCLAW_COMMANDS_*`, `OPENCLAW_HOOKS_*`
 - Channels: `OPENCLAW_TELEGRAM_*`, `OPENCLAW_DISCORD_*`, `OPENCLAW_SLACK_*`, `OPENCLAW_WHATSAPP_*`, `OPENCLAW_GOOGLECHAT_*`, `OPENCLAW_MATTERMOST_*`, `OPENCLAW_SIGNAL_*`, `OPENCLAW_IRC_*`
 - Gateway and UI: `OPENCLAW_GATEWAY_*`, `OPENCLAW_CONTROL_UI_*`, `OPENCLAW_ALLOWED_ORIGINS_JSON`, `OPENCLAW_TAILSCALE_*`, `OPENCLAW_TRUSTED_PROXIES_JSON`

@@ -22,34 +22,60 @@ const render = (template, env) => {
   return JSON.parse(readFileSync(outputFile, "utf8"));
 };
 
-const renderDefault = (env) => {
+const renderDefaultText = (env) => {
   const dir = mkdtempSync(join(tmpdir(), "openclaw-render-"));
   const outputFile = join(dir, "openclaw.json");
   execFileSync("node", [renderScript, defaultTemplate, outputFile], {
     env: { PATH: process.env.PATH, OPENCLAW_GATEWAY_TOKEN: "test-token", ...env },
     cwd: projectRoot,
   });
-  return JSON.parse(readFileSync(outputFile, "utf8"));
+  return readFileSync(outputFile, "utf8");
 };
 
-test("secret values with JSON special characters survive substitution", () => {
-  const secret = 'pa"ss\\word';
-  const config = render('{ "token": "${MY_SECRET}" }', { MY_SECRET: secret });
-  assert.equal(config.token, secret);
+const renderDefault = (env) => JSON.parse(renderDefaultText(env));
+
+// every secret the template can carry, with a value that must never appear
+// in the rendered file
+const secrets = {
+  OPENCLAW_GATEWAY_TOKEN: "secret-gateway-token",
+  LITELLM_MASTER_KEY: "secret-litellm-master",
+  OPENROUTER_API_KEY: "secret-openrouter",
+  OPENAI_API_KEY: "secret-openai",
+  ANTHROPIC_API_KEY: "secret-anthropic",
+  GEMINI_API_KEY: "secret-gemini",
+  OPENCLAW_WHISPER_API_KEY: "secret-whisper",
+  OPENCLAW_TELEGRAM_BOT_TOKEN: "secret-telegram",
+  OPENCLAW_DISCORD_BOT_TOKEN: "secret-discord",
+  OPENCLAW_SLACK_BOT_TOKEN: "secret-slack-bot",
+  OPENCLAW_SLACK_APP_TOKEN: "secret-slack-app",
+  OPENCLAW_MATTERMOST_BOT_TOKEN: "secret-mattermost",
+  OPENCLAW_MATRIX_ACCESS_TOKEN: "secret-matrix",
+  OPENCLAW_MSTEAMS_APP_PASSWORD: "secret-msteams",
+  OPENCLAW_IRC_ENABLED: "true",
+  OPENCLAW_IRC_NICKSERV_PASSWORD: "secret-nickserv",
+  OPENCLAW_NOTION_API_KEY: "secret-notion",
+  OPENCLAW_TRELLO_API_KEY: "secret-trello",
+  OPENCLAW_ELEVENLABS_API_KEY: "secret-elevenlabs",
+  OPENCLAW_BRAVE_API_KEY: "secret-brave",
+  OPENCLAW_GITHUB_TOKEN: "secret-github",
+  OPENCLAW_GITEA_HOST: "https://gitea.example",
+  OPENCLAW_GITEA_TOKEN: "secret-gitea",
+};
+
+test("no secret value is written into openclaw.json, only its placeholder", () => {
+  const text = renderDefaultText(secrets);
+  const leaked = Object.values(secrets).filter((value) => value.startsWith("secret-") && text.includes(value));
+  assert.deepEqual(leaked, []);
+  const config = JSON.parse(text);
+  assert.equal(config.gateway.auth.token, "${OPENCLAW_GATEWAY_TOKEN}");
+  assert.equal(config.channels.telegram.botToken, "${OPENCLAW_TELEGRAM_BOT_TOKEN}");
+  assert.equal(config.models.providers.openai.apiKey, "${OPENAI_API_KEY}");
 });
 
-test("secret values containing template syntax are not evaluated", () => {
-  const secret = "{{ 7 * 7 }}{% if true %}x{% endif %}";
-  const config = render('{ "token": "${MY_SECRET}" }', { MY_SECRET: secret });
-  assert.equal(config.token, secret);
-});
-
-test("secret values containing comma-brace sequences are preserved", () => {
-  const secret = "ab,}cd,]ef";
-  const config = render('{ "token": "${MY_SECRET}", "_end": true }', {
-    MY_SECRET: secret,
-  });
-  assert.equal(config.token, secret);
+test("secret values containing JSON or template syntax never reach the configuration", () => {
+  const secret = 'pa"ss\\w{{ 7 * 7 }}{% if true %}x{% endif %},}';
+  const config = render('{ "token": "${MY_SECRET}", "_end": true }', { MY_SECRET: secret });
+  assert.deepEqual(config, { token: "${MY_SECRET}" });
 });
 
 test("sentinel _end keys are removed at every nesting level", () => {
@@ -101,8 +127,58 @@ test("default template renders valid config with providers and gateway token", (
     OPENAI_API_KEY: "sk-test",
     LITELLM_MASTER_KEY: "llm-key",
   });
-  assert.equal(config.gateway.auth.token, "test-token");
-  assert.equal(config.models.providers.litellm.apiKey, "llm-key");
-  assert.equal(config.models.providers.openai.apiKey, "sk-test");
+  assert.equal(config.gateway.auth.token, "${OPENCLAW_GATEWAY_TOKEN}");
+  assert.equal(config.models.providers.litellm.apiKey, "${LITELLM_MASTER_KEY}");
+  assert.equal(config.models.providers.openai.apiKey, "${OPENAI_API_KEY}");
   assert.equal(JSON.stringify(config).includes("_end"), false);
+});
+
+test("litellm is enabled by its base URL alone and then carries no key", () => {
+  // OpenClaw sends no provider request without an apiKey, so a fixed, public
+  // placeholder stands there; the proxy in front replaces the header
+  const config = renderDefault({ LITELLM_BASE_URL: "http://litellm-proxy:4000" });
+  assert.deepEqual(Object.keys(config.models.providers), ["litellm"]);
+  assert.equal(config.models.providers.litellm.baseUrl, "http://litellm-proxy:4000");
+  assert.equal(config.models.providers.litellm.apiKey, "proxy-supplied");
+  assert.equal(config.auth, undefined);
+  assert.equal(config.agents.defaults.model.primary, "litellm/openrouter/~moonshotai/kimi-latest");
+});
+
+test("the agent has no tool to request a credential and no path out of the sandbox by default", () => {
+  const config = renderDefault({});
+  assert.deepEqual(config.tools.deny, ["secrets"]);
+  assert.equal(config.tools.elevated.enabled, false);
+  assert.equal(config.agents.defaults.sandbox.mode, "all");
+});
+
+test("a scoped LiteLLM key and the Hindsight key reach the configuration only as placeholders", () => {
+  const text = renderDefaultText({
+    LITELLM_BASE_URL: "http://litellm:4000",
+    LITELLM_API_KEY: "secret-litellm-virtual",
+    OPENCLAW_HINDSIGHT_SHARED_URL: "http://hindsight:8888/mcp/shared/",
+    OPENCLAW_HINDSIGHT_OWN_URL: "http://hindsight:8888/mcp/openclaw/",
+    OPENCLAW_HINDSIGHT_API_KEY: "secret-hindsight",
+  });
+  assert.equal(text.includes("secret-litellm-virtual") || text.includes("secret-hindsight"), false);
+  const config = JSON.parse(text);
+  assert.equal(config.models.providers.litellm.apiKey, "${LITELLM_API_KEY}");
+  for (const server of Object.values(config.mcp.servers)) {
+    assert.deepEqual(server.headers, { Authorization: "Bearer ${OPENCLAW_HINDSIGHT_API_KEY}" });
+  }
+});
+
+test("the Hindsight banks become MCP servers from the environment", () => {
+  const config = renderDefault({
+    OPENCLAW_HINDSIGHT_SHARED_URL: "http://hindsight:8888/mcp/shared/",
+    OPENCLAW_HINDSIGHT_OWN_URL: "http://hindsight:8888/mcp/openclaw/",
+  });
+  assert.deepEqual(config.mcp, {
+    servers: {
+      "hindsight-shared": { url: "http://hindsight:8888/mcp/shared/", transport: "streamable-http" },
+      "hindsight-openclaw": { url: "http://hindsight:8888/mcp/openclaw/", transport: "streamable-http" },
+    },
+  });
+  assert.equal(renderDefault({}).mcp, undefined);
+  const own = renderDefault({ OPENCLAW_MCP_JSON: '{"servers":{}}', OPENCLAW_HINDSIGHT_SHARED_URL: "http://x/" });
+  assert.deepEqual(own.mcp, { servers: {} });
 });

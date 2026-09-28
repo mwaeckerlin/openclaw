@@ -18,16 +18,15 @@ try {
   const nunjucksEnv = new nunjucks.Environment(null, { autoescape: false });
   nunjucksEnv.addFilter('int', (val) => parseInt(val, 10) || 0);
 
-  // Render Jinja2 template with nunjucks (env vars as context) BEFORE ${VAR}
-  // substitution, so env values (secrets) never pass through the template engine
+  // Render Jinja2 template with nunjucks (env vars as context). Secrets stay
+  // ${VAR} placeholders inside JSON strings: OpenClaw resolves them from its
+  // environment when it loads the configuration, so no token is ever written
+  // in clear text into openclaw.json on the persistent volume, and a secret
+  // never passes through the template engine or the JSON text
   const rendered = nunjucksEnv.renderString(template, env);
 
-  // Replace ${VAR} placeholders (always inside JSON strings) with JSON-escaped
-  // env values, so quotes/backslashes/newlines in secrets cannot break the config
-  const json = rendered.replace(/\$\{(\w+)\}/g, (_, v) => JSON.stringify(env[v] ?? '').slice(1, -1));
-
   // Parse and post-process
-  let config = JSON.parse(json);
+  let config = JSON.parse(rendered);
 
   // Remove "_end" sentinel keys structurally (they keep the rendered template
   // valid JSON without trailing commas); no regex on the JSON text, which would

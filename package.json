@@ -1,6 +1,6 @@
 {
   "name": "@mwaeckerlin/openclaw",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "scripts": {
     "build": "docker compose build",
     "build:doc": "plantuml -tsvg -o doc README.md",
@@ -9,11 +9,12 @@
     "start:dev": "docker compose up --build --force-recreate --remove-orphans",
     "stop": "docker compose down",
     "deploy": "docker compose push openclaw-gateway openclaw-sandbox",
-    "test": "npm run test:docs && npm run test:unit && npm run test:compose && npm run test:image",
+    "test": "npm run test:docs && npm run test:unit && npm run test:compose && npm run test:image && npm run test:stack",
     "test:docs": "bash tests/docs-contract.sh",
     "test:unit": "node --test tests/*.test.mjs",
     "test:compose": "bash tests/compose-contract.sh",
-    "test:image": "bash tests/gateway-image.sh"
+    "test:image": "bash tests/gateway-image.sh",
+    "test:stack": "bash tests/stack-security.sh"
   },
   "devDependencies": {
     "nunjucks": "^3.2.4"

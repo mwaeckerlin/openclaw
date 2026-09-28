@@ -51,11 +51,17 @@
   "models": {
     "mode": "{{ OPENCLAW_MODELS_MODE | default('replace', true) }}",
     "providers": {
-{% if LITELLM_MASTER_KEY | default('') | length > 0 %}
+{% if LITELLM_MASTER_KEY | default('') | length > 0 or LITELLM_API_KEY | default('') | length > 0 or LITELLM_BASE_URL | default('') | length > 0 %}
       "litellm": {
         "baseUrl": "{{ LITELLM_BASE_URL | default('http://litellm:4000', true) }}",
         "api": "{{ OPENCLAW_LITELLM_API | default('openai-completions', true) }}",
+{% if LITELLM_API_KEY | default('') | length > 0 %}
+        "apiKey": "${LITELLM_API_KEY}",
+{% elif LITELLM_MASTER_KEY | default('') | length > 0 %}
         "apiKey": "${LITELLM_MASTER_KEY}",
+{% else %}
+        "apiKey": "proxy-supplied",
+{% endif %}
         "models": {{ OPENCLAW_LITELLM_MODELS_JSON | default('[]', true) }}
       },
 {% endif %}
@@ -115,7 +121,7 @@
       "model": {
 {% if OPENCLAW_PRIMARY_MODEL | default('') | length > 0 %}
         "primary": "{{ OPENCLAW_PRIMARY_MODEL }}"
-{% elif LITELLM_MASTER_KEY | default('') | length > 0 %}
+{% elif LITELLM_MASTER_KEY | default('') | length > 0 or LITELLM_API_KEY | default('') | length > 0 or LITELLM_BASE_URL | default('') | length > 0 %}
   "primary": "litellm/openrouter/~moonshotai/kimi-latest"
 {% elif OPENROUTER_API_KEY | default('') | length > 0 %}
   "primary": "openrouter/~moonshotai/kimi-latest"
@@ -154,6 +160,10 @@
   "tools": {{ OPENCLAW_TOOLS_JSON }},
 {% else %}
   "tools": {
+    "deny": {{ OPENCLAW_TOOLS_DENY_JSON | default('["secrets"]', true) }},
+    "elevated": {
+      "enabled": {{ OPENCLAW_TOOLS_ELEVATED_ENABLED | default('false', true) }}
+    },
     "fs": {
       "workspaceOnly": {{ OPENCLAW_TOOLS_FS_WORKSPACE_ONLY | default('true', true) }}
     },
@@ -494,6 +504,30 @@
 {% endif %}
 {% if OPENCLAW_MCP_JSON | default('') | length > 0 %}
   "mcp": {{ OPENCLAW_MCP_JSON }},
+{% elif OPENCLAW_HINDSIGHT_SHARED_URL | default('') | length > 0 or OPENCLAW_HINDSIGHT_OWN_URL | default('') | length > 0 %}
+  "mcp": {
+    "servers": {
+{% if OPENCLAW_HINDSIGHT_SHARED_URL | default('') | length > 0 %}
+      "hindsight-shared": {
+        "url": "{{ OPENCLAW_HINDSIGHT_SHARED_URL }}",
+{% if OPENCLAW_HINDSIGHT_API_KEY | default('') | length > 0 %}
+        "headers": { "Authorization": "Bearer ${OPENCLAW_HINDSIGHT_API_KEY}" },
+{% endif %}
+        "transport": "{{ OPENCLAW_HINDSIGHT_TRANSPORT | default('streamable-http', true) }}"
+      },
+{% endif %}
+{% if OPENCLAW_HINDSIGHT_OWN_URL | default('') | length > 0 %}
+      "hindsight-openclaw": {
+        "url": "{{ OPENCLAW_HINDSIGHT_OWN_URL }}",
+{% if OPENCLAW_HINDSIGHT_API_KEY | default('') | length > 0 %}
+        "headers": { "Authorization": "Bearer ${OPENCLAW_HINDSIGHT_API_KEY}" },
+{% endif %}
+        "transport": "{{ OPENCLAW_HINDSIGHT_TRANSPORT | default('streamable-http', true) }}"
+      },
+{% endif %}
+      "_end": true
+    }
+  },
 {% endif %}
 {% if OPENCLAW_SKILLS_JSON | default('') | length > 0 %}
   "skills": {{ OPENCLAW_SKILLS_JSON }},

@@ -82,9 +82,14 @@ if [ -n "$OPENCLAW_DEVICE_PAIRING" ]; then
   echo "Device pairing written to $_state_dir/devices/paired.json"
 fi
 
-if [ -n "$LITELLM_URL" ] && [ -n "$LITELLM_MASTER_KEY" ]; then
+# discovery asks LITELLM_URL, else the base URL the provider uses, with the
+# scoped key (LITELLM_API_KEY) or the master key; without either no
+# Authorization header is sent, a proxy in front adds its own
+_litellm_url="${LITELLM_URL:-$LITELLM_BASE_URL}"
+_litellm_key="${LITELLM_API_KEY:-$LITELLM_MASTER_KEY}"
+if [ -n "$_litellm_url" ] && { [ -n "$_litellm_key" ] || [ -n "$LITELLM_BASE_URL" ]; }; then
   echo "==== Discovering LiteLLM Models ===="
-  if model_count=$(curl -sf -H "Authorization: Bearer $LITELLM_MASTER_KEY" "$LITELLM_URL/v1/models" 2>/dev/null | node -e "
+  if model_count=$(curl -sf ${_litellm_key:+-H "Authorization: Bearer $_litellm_key"} "${_litellm_url%/}/v1/models" 2>/dev/null | node -e "
     const fs = require('fs');
     const cfgPath = process.argv[1];
     const providerId = process.argv[2];
@@ -126,7 +131,7 @@ if [ -n "$LITELLM_URL" ] && [ -n "$LITELLM_MASTER_KEY" ]; then
       echo "  Agent model options synchronized from LiteLLM provider list ($agent_model_count entries)"
     fi
   else
-    echo "WARN: Could not discover LiteLLM models from $LITELLM_URL (continuing with configured/default list)" >&2
+    echo "WARN: Could not discover LiteLLM models from $_litellm_url (continuing with configured/default list)" >&2
   fi
 fi
 

@@ -7,9 +7,14 @@
 #     entrypoint renders a configuration that `openclaw config validate`
 #     accepts — a key the current OpenClaw schema no longer knows fails here
 #   - the gateway starts with the rendered configuration and answers /healthz
+#   - openclaw.json keeps the ${VAR} placeholders, and the gateway accepts the
+#     token it resolves from them
+#   - with LITELLM_BASE_URL alone, a model call reaches the endpoint without
+#     an Authorization header
 #
 # The containers run without network: model discovery then fails fast with a
-# warning, exactly as it does when a provider is unreachable.
+# warning, exactly as it does when a provider is unreachable. The LiteLLM check
+# runs on a network of its own with a recording endpoint.
 #
 # Needs the built image: `npm run build` (or `docker compose build
 # openclaw-gateway`). Usage: tests/gateway-image.sh [<image>]
@@ -21,6 +26,11 @@ IMAGE="${1:-mwaeckerlin/openclaw:gateway}"
 # the base the build pulls; `pull: true` in docker-compose.yml keeps it current
 BASE_IMAGE="openclaw/openclaw:latest"
 NAME="openclaw-gateway-image-test-$$"
+NETWORK="openclaw-gateway-image-test-$$"
+STUB="openclaw-litellm-stub-$$"
+VOLUME="openclaw-gateway-image-test-config-$$"
+SECRETS="openclaw-gateway-image-test-secrets-$$"
+SECRETS_DIR="$(mktemp -d)"
 PASS=0
 FAIL=0
 declare -a FAILED_NAMES
@@ -28,13 +38,62 @@ declare -a FAILED_NAMES
 _pass() { PASS=$((PASS + 1)); echo "  PASS  $1"; }
 _fail() { FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1"); echo "  FAIL  $1: $2"; }
 
-cleanup() { docker rm -f "${NAME}" >/dev/null 2>&1; }
+cleanup() {
+    docker rm -f "${NAME}" "${STUB}" "${SECRETS}" >/dev/null 2>&1
+    docker network rm "${NETWORK}" >/dev/null 2>&1
+    docker volume rm "${VOLUME}" >/dev/null 2>&1
+    rm -rf "${SECRETS_DIR}"
+}
 trap cleanup EXIT
+
+# An OpenAI-compatible endpoint in the place of the proxy in front of LiteLLM:
+# it answers /v1/models and /v1/chat/completions (plain and streamed, the
+# shape LiteLLM answers with) and logs every request with the Authorization
+# header it carried, so the test sees exactly what the gateway sends
+STUB_SERVER='
+const http = require("http")
+const model = "stub-model"
+http.createServer((req, res) => {
+  let body = ""
+  req.on("data", (chunk) => (body += chunk))
+  req.on("end", () => {
+    console.log("REQUEST", req.method, req.url, "authorization=" + (req.headers.authorization ?? "none"))
+    if (req.url.endsWith("/models")) {
+      res.writeHead(200, { "content-type": "application/json" })
+      return res.end(JSON.stringify({ object: "list", data: [{ id: model, object: "model", created: 0, owned_by: "openai" }] }))
+    }
+    const stream = (() => { try { return JSON.parse(body).stream } catch { return false } })()
+    const message = { role: "assistant", content: "pong" }
+    if (stream) {
+      res.writeHead(200, { "content-type": "text/event-stream" })
+      res.write("data: " + JSON.stringify({ id: "c1", object: "chat.completion.chunk", created: 0, model, choices: [{ index: 0, delta: message, finish_reason: null }] }) + "\n\n")
+      res.write("data: " + JSON.stringify({ id: "c1", object: "chat.completion.chunk", created: 0, model, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }) + "\n\n")
+      return res.end("data: [DONE]\n\n")
+    }
+    res.writeHead(200, { "content-type": "application/json" })
+    res.end(JSON.stringify({ id: "c1", object: "chat.completion", created: 0, model, choices: [{ index: 0, message, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }))
+  })
+}).listen(4000)
+'
 
 BASE_ENV=(
     -e OPENCLAW_GATEWAY_TOKEN=test-token
     -e "OPENCLAW_SANDBOX_SSH_PRIVATE_KEY=-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----"
 )
+
+# wait_healthy: <container> — until the gateway answers /healthz or stops
+wait_healthy() {
+    for _ in $(seq 1 150); do
+        if docker exec "$1" node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
+            return 0
+        fi
+        if [[ "$(docker inspect --format '{{.State.Running}}' "$1" 2>/dev/null)" != "true" ]]; then
+            return 1
+        fi
+        sleep 2
+    done
+    return 1
+}
 
 echo "==> Gateway image contract: ${IMAGE}"
 
@@ -116,19 +175,43 @@ else
         -e OPENCLAW_NOTION_API_KEY=nt-test \
         -e OPENCLAW_TRELLO_API_KEY=tr-test \
         -e OPENCLAW_ELEVENLABS_API_KEY=el-test
+    validate hindsight_and_litellm_without_key \
+        -e OPENCLAW_HINDSIGHT_SHARED_URL=http://hindsight:8888/mcp/shared/ \
+        -e OPENCLAW_HINDSIGHT_OWN_URL=http://hindsight:8888/mcp/openclaw/ \
+        -e LITELLM_BASE_URL=http://litellm-proxy:4000
+    validate hindsight_and_litellm_with_scoped_keys \
+        -e OPENCLAW_HINDSIGHT_SHARED_URL=http://hindsight:8888/mcp/shared/ \
+        -e OPENCLAW_HINDSIGHT_OWN_URL=http://hindsight:8888/mcp/openclaw/ \
+        -e OPENCLAW_HINDSIGHT_API_KEY=hs-test \
+        -e LITELLM_BASE_URL=http://litellm:4000 \
+        -e LITELLM_API_KEY=sk-scoped-test
 
-    docker run -d --name "${NAME}" --network none "${BASE_ENV[@]}" "${IMAGE}" >/dev/null
+    # LiteLLM without a key: a model call through the local inference path
+    # reaches the endpoint carrying only the public placeholder
+    # "proxy-supplied" (OpenClaw sends no provider request without some key),
+    # and model discovery carries no header at all; the real key is what the
+    # proxy in front of LiteLLM puts into the Authorization header
+    docker network create "${NETWORK}" >/dev/null
+    docker run -d --name "${STUB}" --network "${NETWORK}" --entrypoint node "${IMAGE}" -e "${STUB_SERVER}" >/dev/null
+    INFER=$(docker run --rm --network "${NETWORK}" "${BASE_ENV[@]}" \
+        -e "LITELLM_BASE_URL=http://${STUB}:4000" \
+        "${IMAGE}" node openclaw.mjs infer model run --local --model litellm/stub-model --prompt "Reply with exactly: pong" --json 2>&1)
+    INFER_STATUS=$?
+    STUB_LOG=$(docker logs "${STUB}" 2>&1)
+    if [[ ${INFER_STATUS} -eq 0 && "${INFER}" == *pong* ]] \
+        && echo "${STUB_LOG}" | grep -qE "REQUEST POST [^ ]*/chat/completions authorization=Bearer proxy-supplied$" \
+        && echo "${STUB_LOG}" | grep -qE "REQUEST GET /v1/models authorization=none$" \
+        && ! echo "${STUB_LOG}" | grep "REQUEST" | grep -qvE "authorization=(none|Bearer proxy-supplied)$"; then
+        _pass "litellm_called_without_key"
+    else
+        _fail "litellm_called_without_key" "exit ${INFER_STATUS}; $(echo "${INFER}" | tail -n 15); endpoint log: ${STUB_LOG}"
+    fi
+
+    # the gateway runs on a fresh named volume, as in the stack, so the check
+    # covers the ownership a new volume takes over from the image
+    docker run -d --name "${NAME}" --network none -v "${VOLUME}:/home/node/.openclaw" "${BASE_ENV[@]}" "${IMAGE}" >/dev/null
     HEALTHY=""
-    for _ in $(seq 1 90); do
-        if docker exec "${NAME}" node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
-            HEALTHY=yes
-            break
-        fi
-        if [[ "$(docker inspect --format '{{.State.Running}}' "${NAME}" 2>/dev/null)" != "true" ]]; then
-            break
-        fi
-        sleep 2
-    done
+    wait_healthy "${NAME}" && HEALTHY=yes
     # /healthz also answers after the gateway rejected keys of its
     # configuration or migrated retired ones away at startup (it then runs on
     # built-in defaults), so its log must report neither
@@ -137,6 +220,51 @@ else
         _pass "gateway_answers_healthz"
     else
         _fail "gateway_answers_healthz" "$(docker logs --tail 30 "${NAME}" 2>&1)"
+    fi
+
+    if docker exec "${NAME}" test -w /home/node/.openclaw/openclaw.json; then
+        _pass "fresh_volume_writable"
+    else
+        _fail "fresh_volume_writable" "the gateway cannot write its configuration on a fresh volume"
+    fi
+
+    # the configuration on the volume carries the placeholder and never the
+    # token, and the running gateway still accepts the token it resolved from
+    # its environment — and refuses any other
+    STORED=$(docker exec "${NAME}" cat /home/node/.openclaw/openclaw.json 2>&1)
+    if [[ "${STORED}" != *test-token* && "${STORED}" == *'${OPENCLAW_GATEWAY_TOKEN}'* ]]; then
+        _pass "no_token_in_stored_config"
+    else
+        _fail "no_token_in_stored_config" "openclaw.json holds the token or lacks its placeholder"
+    fi
+    if docker exec "${NAME}" node openclaw.mjs gateway call health --url ws://127.0.0.1:18789 --token test-token --json >/dev/null 2>&1 \
+        && ! docker exec "${NAME}" node openclaw.mjs gateway call health --url ws://127.0.0.1:18789 --token wrong-token --json >/dev/null 2>&1; then
+        _pass "placeholder_token_resolved"
+    else
+        _fail "placeholder_token_resolved" "$(docker exec "${NAME}" node openclaw.mjs gateway call health --url ws://127.0.0.1:18789 --token test-token --json 2>&1 | tail -n 10)"
+    fi
+
+    # credentials as Docker secret files: the gateway takes its token and the
+    # scoped LiteLLM key from /run/secrets, without any of them in the
+    # environment the container was started with or in the stored config
+    mkdir -p "${SECRETS_DIR}/secrets"
+    printf 'secret-file-gateway-token' > "${SECRETS_DIR}/secrets/openclaw_gateway_token"
+    printf 'secret-file-litellm-key' > "${SECRETS_DIR}/secrets/litellm_api_key"
+    docker create --name "${SECRETS}" --network none \
+        -e "OPENCLAW_SANDBOX_SSH_PRIVATE_KEY=-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----" \
+        -e LITELLM_BASE_URL=http://litellm:4000 \
+        "${IMAGE}" >/dev/null
+    docker cp "${SECRETS_DIR}/secrets" "${SECRETS}:/run/secrets" >/dev/null
+    docker start "${SECRETS}" >/dev/null
+    SECRET_STORED=""
+    if wait_healthy "${SECRETS}"; then
+        SECRET_STORED=$(docker exec "${SECRETS}" cat /home/node/.openclaw/openclaw.json 2>&1)
+    fi
+    if [[ -n "${SECRET_STORED}" && "${SECRET_STORED}" != *secret-file-* && "${SECRET_STORED}" == *'${LITELLM_API_KEY}'* ]] \
+        && docker exec "${SECRETS}" node openclaw.mjs gateway call health --url ws://127.0.0.1:18789 --token secret-file-gateway-token --json >/dev/null 2>&1; then
+        _pass "credentials_from_docker_secrets"
+    else
+        _fail "credentials_from_docker_secrets" "$(docker logs --tail 20 "${SECRETS}" 2>&1)"
     fi
 fi
 

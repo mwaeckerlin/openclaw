@@ -10,8 +10,6 @@ services:
     depends_on:
       openclaw-sandbox:
         condition: service_healthy
-      allow-write-access:
-        condition: service_started
     environment:
       HOME: /home/node
       TERM: xterm-256color
@@ -39,6 +37,7 @@ services:
       OPENCLAW_BRAVE_API_KEY:
       # LiteLLM
       LITELLM_MASTER_KEY:
+      LITELLM_API_KEY:
       LITELLM_URL:
       LITELLM_BASE_URL:
       # Agent defaults
@@ -93,6 +92,10 @@ services:
       OPENCLAW_DESKTOP_JSON:
       OPENCLAW_MEMORY_JSON:
       OPENCLAW_MCP_JSON:
+      OPENCLAW_HINDSIGHT_SHARED_URL:
+      OPENCLAW_HINDSIGHT_OWN_URL:
+      OPENCLAW_HINDSIGHT_TRANSPORT:
+      OPENCLAW_HINDSIGHT_API_KEY:
       OPENCLAW_SKILLS_JSON:
       OPENCLAW_PLUGINS_JSON:
       OPENCLAW_SURFACES_JSON:
@@ -116,6 +119,8 @@ services:
       OPENCLAW_AGENT_MODELS_JSON:
       OPENCLAW_SUBAGENT_TIMEOUT_SECONDS:
       OPENCLAW_SUBAGENT_MAX_CONCURRENT:
+      OPENCLAW_TOOLS_DENY_JSON:
+      OPENCLAW_TOOLS_ELEVATED_ENABLED:
       OPENCLAW_TOOLS_FS_WORKSPACE_ONLY:
       OPENCLAW_LOOP_DETECTION_ENABLED:
       OPENCLAW_MEDIA_AUDIO_ENABLED:
@@ -210,6 +215,10 @@ services:
       OPENCLAW_ACPX_GITEA_COMMAND:
       OPENCLAW_ACPX_GITEA_ARGS_JSON:
     volumes:
+      # the official image creates /home/node/.openclaw owned by node, and a
+      # new named volume takes over that ownership, so no bootstrap service
+      # is needed (mwaeckerlin/allow-write-access now hands /app to its own
+      # user somebody, which locked node out of this volume)
       - openclaw-config:/home/node/.openclaw
     ports:
       # bound to loopback by default: the token-auth UI is for local testing only,
@@ -295,13 +304,6 @@ services:
       - no-new-privileges:true
     networks:
       - sandbox-mcp-github
-
-  allow-write-access:
-    image: mwaeckerlin/allow-write-access
-    environment:
-      ALLOW_USER: "chown -R 1000:1000"
-    volumes:
-      - openclaw-config:/app
 
 networks:
   gateway-sandbox:
