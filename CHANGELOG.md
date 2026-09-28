@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-09-29 **1.1.5**
+    - Development goes to OpenCode: the agent hands software development tasks to the central OpenCode server set in `OPENCLAW_OPENCODE_URL` and reports its result; the sandbox carries the OpenCode client
+
 - 2026-09-28 **1.1.4**
     - The AI agent has no tool to ask for a credential any more (the `secrets` tool is denied), elevated mode is switched off explicitly, and the agent's skill tells it never to ask for or accept a token or a password; the README says at the top what this protects and which settings switch it off
     - A fresh installation starts again: the ownership bootstrap service gave the configuration volume to a user the gateway does not run as, so the gateway could not write its configuration; the service is gone, the image's own ownership applies

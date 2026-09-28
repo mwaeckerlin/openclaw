@@ -1,0 +1,74 @@
+#!/bin/bash
+# opencode-delegate — hand a development task to the central OpenCode server
+# and print its answer.
+#
+#   opencode-delegate [--dir <path on the server>] [--session <id>] "<task>"
+#
+# Uses OpenCode's HTTP API at OPENCLAW_OPENCODE_URL: creates a session (or
+# continues --session), sends the task, waits until OpenCode is done, and
+# prints the text of its answer, followed by the session id for a follow-up.
+# `opencode run --attach` reaches the server as well, but in OpenCode 1.18 it
+# prints no answer text without a terminal (measured 2026-09-28), so the
+# agent uses this command.
+set -euo pipefail
+
+usage() { echo "usage: opencode-delegate [--dir <path>] [--session <id>] \"<task>\"" >&2; exit 2; }
+
+dir=""
+session=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dir) [ $# -ge 2 ] || usage; dir="$2"; shift 2 ;;
+    --session) [ $# -ge 2 ] || usage; session="$2"; shift 2 ;;
+    --) shift; break ;;
+    -*) usage ;;
+    *) break ;;
+  esac
+done
+[ $# -ge 1 ] || usage
+task="$*"
+
+url="${OPENCLAW_OPENCODE_URL:-}"
+if [ -z "${url}" ]; then
+  echo "opencode-delegate: OPENCLAW_OPENCODE_URL is not set, no OpenCode server is configured" >&2
+  exit 3
+fi
+url="${url%/}"
+
+query=""
+if [ -n "${dir}" ]; then
+  query="?directory=$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "${dir}")"
+fi
+
+api() {
+  # api <method> <path> [<json body>]
+  local status body
+  body=$(curl -sS -X "$1" -H "content-type: application/json" \
+    -w '\n%{http_code}' ${3:+--data-binary "$3"} "${url}$2${query}") || {
+    echo "opencode-delegate: OpenCode server at ${url} is not reachable" >&2; exit 4; }
+  status="${body##*$'\n'}"
+  body="${body%$'\n'*}"
+  if [ "${status}" -ge 400 ]; then
+    echo "opencode-delegate: OpenCode answered HTTP ${status} on $1 $2: ${body}" >&2
+    exit 5
+  fi
+  printf '%s' "${body}"
+}
+
+if [ -z "${session}" ]; then
+  title=$(printf '%s' "${task}" | head -c 60)
+  session=$(api POST /session "$(node -e 'console.log(JSON.stringify({ title: process.argv[1] }))' "${title}")" \
+    | node -e 'console.log(JSON.parse(require("fs").readFileSync(0, "utf8")).id)')
+fi
+
+api POST "/session/${session}/message" \
+  "$(node -e 'console.log(JSON.stringify({ parts: [{ type: "text", text: process.argv[1] }] }))' "${task}")" \
+  | node -e '
+    const reply = JSON.parse(require("fs").readFileSync(0, "utf8"))
+    const text = (reply.parts ?? []).filter((part) => part.type === "text").map((part) => part.text).join("\n").trim()
+    const error = reply.info?.error
+    if (error) { console.error("opencode-delegate: OpenCode reported: " + JSON.stringify(error)); process.exit(6) }
+    console.log(text || "(OpenCode gave no text answer)")
+  '
+echo
+echo "OpenCode session: ${session}"

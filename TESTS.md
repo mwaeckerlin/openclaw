@@ -11,6 +11,13 @@ The sandbox toolset and SSH behaviour are tested end to end in the [mwaeckerlin/
 - **F8** `tests/stack-security.sh` › stack_starts, agent_tool_policy — in the running stack, `openclaw sandbox explain` shows sandboxed sessions whose tool policy grants none of `secrets`, `gateway`, `web_fetch`, `web_search`, `browser`, `nodes`, `canvas`, and elevated mode switched off and not allowed by the configuration.
 - **F8** `tests/stack-security.sh` › sandbox_holds_no_credential — the sandbox container holds none of the gateway's test credentials in its environment and no Docker secret file.
 
+## Delegation tests
+
+`npm run test:opencode` runs against the built sandbox image (`npm run build` first).
+
+- **F9** `tests/opencode-delegation.sh` › sandbox_has_opencode_client, task_delegated_and_answered — the sandbox image carries the OpenCode client and `opencode-delegate`, which hands a task to an OpenCode server (its model the recording endpoint of `tests/openai-stub.cjs`), prints the answer and the session id, and continues that session with a follow-up.
+- **F9** `tests/opencode-delegation.sh` › password_server_refuses_sandbox — a server with `OPENCODE_SERVER_PASSWORD` refuses the sandbox, which holds no password, with HTTP 401 and a clear message, and answers a client that has the password.
+
 ## Image tests
 
 `npm run test:image` runs against the built gateway image (`npm run build` first).

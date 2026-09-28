@@ -245,6 +245,9 @@ services:
       DOCKER_HOST: tcp://openclaw-dind:2375
       OPENCLAW_MCP_GATEWAY_URL: http://openclaw-mcp-gateway:4000
       MCP_GITHUB_URL: http://mcp-github:4000
+      # the central OpenCode server development tasks are delegated to,
+      # e.g. http://opencode:4096; empty: no delegation
+      OPENCLAW_OPENCODE_URL:
     volumes:
       - openclaw-workspace:/home/somebody
     security_opt:

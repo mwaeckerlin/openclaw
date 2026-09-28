@@ -6,6 +6,10 @@ FROM mwaeckerlin/mcp-github AS mcp_github_skills
 
 FROM mwaeckerlin/sandbox-base AS build
 ENV CONTAINERNAME="openclaw"
+# the OpenCode client and opencode-delegate: the agent hands development
+# tasks to the central OpenCode server and gets the answer back
+RUN npm install --global opencode-ai && opencode --version
+COPY --chmod=0755 files/opencode-delegate /usr/local/bin/opencode-delegate
 ADD https://github.com/mwaeckerlin/ai-agent-skills.git#master:skills /app/skills/
 COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/
 COPY --from=mcp_github_skills /app/skills/mcp-github /app/skills/

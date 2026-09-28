@@ -7,11 +7,12 @@ FROM openclaw/openclaw:latest AS build
 RUN cd /tmp && npm install nunjucks
 ENV NODE_PATH=/tmp/node_modules
 RUN install -d -m 700 /home/node/.ssh
-RUN install -d -m 755 /app/skills/ssh-sandbox /app/skills/openclaw-mcp-gateway
+RUN install -d -m 755 /app/skills/ssh-sandbox /app/skills/openclaw-mcp-gateway /app/skills/opencode-delegation
 ADD files/gateway-entrypoint.sh /entrypoint.sh
 ADD files/render-config.js /render-config.js
 ADD files/openclaw.json.j2 /openclaw.json.j2.default
 ADD files/SKILL.md /app/skills/ssh-sandbox/SKILL.md
+ADD files/opencode-delegation/SKILL.md /app/skills/opencode-delegation/SKILL.md
 ADD https://github.com/mwaeckerlin/ai-agent-skills.git#master:skills /app/skills/
 COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/
 COPY --from=mcp_github_skills /app/skills/mcp-github /app/skills/

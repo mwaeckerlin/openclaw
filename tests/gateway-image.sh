@@ -46,35 +46,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# An OpenAI-compatible endpoint in the place of the proxy in front of LiteLLM:
-# it answers /v1/models and /v1/chat/completions (plain and streamed, the
-# shape LiteLLM answers with) and logs every request with the Authorization
-# header it carried, so the test sees exactly what the gateway sends
-STUB_SERVER='
-const http = require("http")
-const model = "stub-model"
-http.createServer((req, res) => {
-  let body = ""
-  req.on("data", (chunk) => (body += chunk))
-  req.on("end", () => {
-    console.log("REQUEST", req.method, req.url, "authorization=" + (req.headers.authorization ?? "none"))
-    if (req.url.endsWith("/models")) {
-      res.writeHead(200, { "content-type": "application/json" })
-      return res.end(JSON.stringify({ object: "list", data: [{ id: model, object: "model", created: 0, owned_by: "openai" }] }))
-    }
-    const stream = (() => { try { return JSON.parse(body).stream } catch { return false } })()
-    const message = { role: "assistant", content: "pong" }
-    if (stream) {
-      res.writeHead(200, { "content-type": "text/event-stream" })
-      res.write("data: " + JSON.stringify({ id: "c1", object: "chat.completion.chunk", created: 0, model, choices: [{ index: 0, delta: message, finish_reason: null }] }) + "\n\n")
-      res.write("data: " + JSON.stringify({ id: "c1", object: "chat.completion.chunk", created: 0, model, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }) + "\n\n")
-      return res.end("data: [DONE]\n\n")
-    }
-    res.writeHead(200, { "content-type": "application/json" })
-    res.end(JSON.stringify({ id: "c1", object: "chat.completion", created: 0, model, choices: [{ index: 0, message, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }))
-  })
-}).listen(4000)
-'
+# the recording OpenAI-compatible endpoint shared by the tests
+STUB_SERVER="$(cat tests/openai-stub.cjs)"
 
 BASE_ENV=(
     -e OPENCLAW_GATEWAY_TOKEN=test-token
