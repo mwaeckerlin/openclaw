@@ -31,7 +31,7 @@ _pass() { PASS=$((PASS + 1)); echo "  PASS  $1"; }
 _fail() { FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1"); echo "  FAIL  $1: $2"; }
 
 cleanup() {
-    docker rm -f "${STUB}" "${SERVER}" "${LOCKED}" >/dev/null 2>&1
+    docker rm -f "${STUB}" "${SERVER}" "${LOCKED}" "openclaw-opencode-stalled-$$" "openclaw-opencode-stalled-$$-client" >/dev/null 2>&1
     docker network rm "${NETWORK}" >/dev/null 2>&1
 }
 trap cleanup EXIT
@@ -94,13 +94,42 @@ if serve "${LOCKED}" -e "OPENCODE_SERVER_PASSWORD=${PASSWORD}"; then
     REFUSED=$(delegate "${LOCKED}" "Reply with exactly: pong")
     REFUSED_STATUS=$?
     OPEN_STATUS=$(docker run --rm --network "${NETWORK}" --entrypoint curl "${IMAGE}" -s -o /dev/null -w '%{http_code}' -u "opencode:${PASSWORD}" "http://${LOCKED}:4096/session")
-    if [[ ${REFUSED_STATUS} -ne 0 && "${REFUSED}" == *"HTTP 401"* && "${OPEN_STATUS}" == "200" ]]; then
+    if [[ ${REFUSED_STATUS} -eq 5 && "${REFUSED}" == *"HTTP 401"* && "${REFUSED}" != *SyntaxError* && "${OPEN_STATUS}" == "200" ]]; then
         _pass "password_server_refuses_sandbox"
     else
         _fail "password_server_refuses_sandbox" "sandbox without password: exit ${REFUSED_STATUS}, ${REFUSED}; client with password: HTTP ${OPEN_STATUS}"
     fi
 else
     _fail "password_server_refuses_sandbox" "OpenCode server with password did not start: $(docker logs --tail 15 "${LOCKED}" 2>&1)"
+fi
+
+# an address nobody answers on: the command ends at once with its message
+UNREACHABLE=$(docker run --rm --network "${NETWORK}" -e "OPENCLAW_OPENCODE_URL=http://nobody-here-$$:4096" \
+    --entrypoint opencode-delegate "${IMAGE}" "Reply with exactly: pong" 2>&1)
+UNREACHABLE_STATUS=$?
+if [[ ${UNREACHABLE_STATUS} -eq 4 && "${UNREACHABLE}" == *"is not reachable"* && "${UNREACHABLE}" != *SyntaxError* ]]; then
+    _pass "unreachable_server_reported"
+else
+    _fail "unreachable_server_reported" "exit ${UNREACHABLE_STATUS}: ${UNREACHABLE}"
+fi
+
+# a server that takes the connection and never answers: the wait ends after
+# OPENCLAW_OPENCODE_TIMEOUT seconds with the message, and the agent goes on
+STALLED="openclaw-opencode-stalled-$$"
+docker run -d --name "${STALLED}" --network "${NETWORK}" --entrypoint node "${IMAGE}" \
+    -e 'require("http").createServer(() => {}).listen(4096)' >/dev/null
+sleep 2
+START=$(date +%s)
+# the outer limit keeps a command without its own limit from blocking the suite
+STALL=$(timeout 60 docker run --rm --name "${STALLED}-client" --network "${NETWORK}" -e "OPENCLAW_OPENCODE_URL=http://${STALLED}:4096" \
+    -e OPENCLAW_OPENCODE_TIMEOUT=3 --entrypoint opencode-delegate "${IMAGE}" "Reply with exactly: pong" 2>&1)
+STALL_STATUS=$?
+STALL_SECONDS=$(( $(date +%s) - START ))
+docker rm -f "${STALLED}" "${STALLED}-client" >/dev/null 2>&1
+if [[ ${STALL_STATUS} -eq 4 && "${STALL}" == *"did not answer within 3s"* && ${STALL_SECONDS} -lt 30 ]]; then
+    _pass "stalled_server_ends_the_wait"
+else
+    _fail "stalled_server_ends_the_wait" "exit ${STALL_STATUS} after ${STALL_SECONDS}s: ${STALL}"
 fi
 
 echo ""

@@ -3,12 +3,14 @@
 # adds the openclaw skills and its entrypoint.
 FROM mwaeckerlin/openclaw-mcp-gateway AS mcp_gateway_skills
 FROM mwaeckerlin/mcp-github AS mcp_github_skills
+FROM mwaeckerlin/opencode:sandbox AS opencode
 
 FROM mwaeckerlin/sandbox-base AS build
 ENV CONTAINERNAME="openclaw"
-# the OpenCode client and opencode-delegate: the agent hands development
+# the OpenCode client, from the published OpenCode image so that it matches the
+# central server's release, and opencode-delegate: the agent hands development
 # tasks to the central OpenCode server and gets the answer back
-RUN npm install --global opencode-ai && opencode --version
+COPY --from=opencode /usr/local/bin/opencode /usr/local/bin/opencode
 COPY --chmod=0755 files/opencode-delegate /usr/local/bin/opencode-delegate
 ADD https://github.com/mwaeckerlin/ai-agent-skills.git#master:skills /app/skills/
 COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/

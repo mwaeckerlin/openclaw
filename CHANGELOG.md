@@ -1,5 +1,10 @@
 # Changelog
 
+- 2026-09-29 **1.1.6**
+    - A delegation to OpenCode that fails now says why: an unreachable server and a refused call (for example a server that requires a password) end with their own message and exit code instead of a parser error
+    - A delegation no longer waits forever on a server that does not answer: it stops after `OPENCLAW_OPENCODE_TIMEOUT` seconds (default 7200) with a message
+    - The OpenCode client in the sandbox comes from the published `mwaeckerlin/opencode:sandbox` image, so it always matches the release of the central OpenCode server
+
 - 2026-09-29 **1.1.5**
     - Development goes to OpenCode: the agent hands software development tasks to the central OpenCode server set in `OPENCLAW_OPENCODE_URL` and reports its result; the sandbox carries the OpenCode client
 

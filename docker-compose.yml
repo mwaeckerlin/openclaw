@@ -248,6 +248,9 @@ services:
       # the central OpenCode server development tasks are delegated to,
       # e.g. http://opencode:4096; empty: no delegation
       OPENCLAW_OPENCODE_URL:
+      # seconds a delegated task may take before the agent stops waiting
+      # (default 7200)
+      OPENCLAW_OPENCODE_TIMEOUT:
     volumes:
       - openclaw-workspace:/home/somebody
     security_opt:

@@ -16,7 +16,8 @@ The sandbox toolset and SSH behaviour are tested end to end in the [mwaeckerlin/
 `npm run test:opencode` runs against the built sandbox image (`npm run build` first).
 
 - **F9** `tests/opencode-delegation.sh` › sandbox_has_opencode_client, task_delegated_and_answered — the sandbox image carries the OpenCode client and `opencode-delegate`, which hands a task to an OpenCode server (its model the recording endpoint of `tests/openai-stub.cjs`), prints the answer and the session id, and continues that session with a follow-up.
-- **F9** `tests/opencode-delegation.sh` › password_server_refuses_sandbox — a server with `OPENCODE_SERVER_PASSWORD` refuses the sandbox, which holds no password, with HTTP 401 and a clear message, and answers a client that has the password.
+- **F9** `tests/opencode-delegation.sh` › password_server_refuses_sandbox — a server with `OPENCODE_SERVER_PASSWORD` refuses the sandbox, which holds no password: `opencode-delegate` ends with exit 5 and the message about HTTP 401, never a parser error, while the server answers a client that has the password.
+- **F9** `tests/opencode-delegation.sh` › unreachable_server_reported, stalled_server_ends_the_wait — an address nobody answers on ends with exit 4 and its message; a server that takes the connection and never answers ends the wait after `OPENCLAW_OPENCODE_TIMEOUT` seconds (3 in the test) with exit 4 and the message.
 
 ## Image tests
 

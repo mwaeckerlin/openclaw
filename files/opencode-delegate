@@ -5,8 +5,9 @@
 #   opencode-delegate [--dir <path on the server>] [--session <id>] "<task>"
 #
 # Uses OpenCode's HTTP API at OPENCLAW_OPENCODE_URL: creates a session (or
-# continues --session), sends the task, waits until OpenCode is done, and
-# prints the text of its answer, followed by the session id for a follow-up.
+# continues --session), sends the task, waits until OpenCode is done (at most
+# OPENCLAW_OPENCODE_TIMEOUT seconds, default 7200), and prints the text of its
+# answer, followed by the session id for a follow-up.
 # `opencode run --attach` reaches the server as well, but in OpenCode 1.18 it
 # prints no answer text without a terminal (measured 2026-09-28), so the
 # agent uses this command.
@@ -43,9 +44,10 @@ fi
 api() {
   # api <method> <path> [<json body>]
   local status body
-  body=$(curl -sS -X "$1" -H "content-type: application/json" \
+  # a stalled server ends the wait after OPENCLAW_OPENCODE_TIMEOUT seconds
+  body=$(curl -sS -m "${OPENCLAW_OPENCODE_TIMEOUT:-7200}" -X "$1" -H "content-type: application/json" \
     -w '\n%{http_code}' ${3:+--data-binary "$3"} "${url}$2${query}") || {
-    echo "opencode-delegate: OpenCode server at ${url} is not reachable" >&2; exit 4; }
+    echo "opencode-delegate: OpenCode server at ${url} is not reachable or did not answer within ${OPENCLAW_OPENCODE_TIMEOUT:-7200}s" >&2; exit 4; }
   status="${body##*$'\n'}"
   body="${body%$'\n'*}"
   if [ "${status}" -ge 400 ]; then
@@ -57,13 +59,15 @@ api() {
 
 if [ -z "${session}" ]; then
   title=$(printf '%s' "${task}" | head -c 60)
-  session=$(api POST /session "$(node -e 'console.log(JSON.stringify({ title: process.argv[1] }))' "${title}")" \
-    | node -e 'console.log(JSON.parse(require("fs").readFileSync(0, "utf8")).id)')
+  # api runs in a subshell here: its exit code is taken over before the answer
+  # is parsed, so a failed call ends with its own code and message
+  created=$(api POST /session "$(node -e 'console.log(JSON.stringify({ title: process.argv[1] }))' "${title}")") || exit $?
+  session=$(printf '%s' "${created}" | node -e 'console.log(JSON.parse(require("fs").readFileSync(0, "utf8")).id)')
 fi
 
-api POST "/session/${session}/message" \
-  "$(node -e 'console.log(JSON.stringify({ parts: [{ type: "text", text: process.argv[1] }] }))' "${task}")" \
-  | node -e '
+reply=$(api POST "/session/${session}/message" \
+  "$(node -e 'console.log(JSON.stringify({ parts: [{ type: "text", text: process.argv[1] }] }))' "${task}")") || exit $?
+printf '%s' "${reply}" | node -e '
     const reply = JSON.parse(require("fs").readFileSync(0, "utf8"))
     const text = (reply.parts ?? []).filter((part) => part.type === "text").map((part) => part.text).join("\n").trim()
     const error = reply.info?.error

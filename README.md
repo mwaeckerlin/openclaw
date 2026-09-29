@@ -318,11 +318,12 @@ Without a key in the gateway: set only `LITELLM_BASE_URL` to a proxy in front of
 
 ### Development with OpenCode
 
-The agent hands every software development task to the central [OpenCode](https://opencode.ai) server of the cluster, which works in its own workspace and is tuned for exactly that. The sandbox carries the OpenCode client and the command `opencode-delegate "<task>"`, which the skill `opencode-delegation` tells the agent to use: it sends the task to OpenCode's HTTP API, waits until OpenCode is done, and prints the answer into the conversation, with the session id for a follow-up (`--session <id>`). `opencode run --attach` reaches the server as well, but in OpenCode 1.18 it prints no answer without a terminal.
+The agent hands every software development task to the central [OpenCode](https://opencode.ai) server of the cluster, which works in its own workspace and is tuned for exactly that. The sandbox carries the OpenCode client, taken from the published [`mwaeckerlin/opencode:sandbox`](https://hub.docker.com/r/mwaeckerlin/opencode) image so that it matches the server's release, and the command `opencode-delegate "<task>"`, which the skill `opencode-delegation` tells the agent to use: it sends the task to OpenCode's HTTP API, waits until OpenCode is done, and prints the answer into the conversation, with the session id for a follow-up (`--session <id>`). `opencode run --attach` reaches the server as well, but in OpenCode 1.18 it prints no answer without a terminal.
 
 | Variable | Default | Description |
 |---|---|---|
 | `OPENCLAW_OPENCODE_URL` | — | URL of the OpenCode server (`opencode serve`, default port 4096), e.g. `http://opencode:4096`; set on the sandbox service; empty: no delegation |
+| `OPENCLAW_OPENCODE_TIMEOUT` | `7200` | Seconds a delegated task may take before `opencode-delegate` stops waiting; set on the sandbox service |
 
 The sandbox reaches OpenCode directly, so it shares a network with the OpenCode server, and nothing else of the stack needs to. OpenCode's optional password (`OPENCODE_SERVER_PASSWORD` on the server) never belongs into the sandbox, because the agent could read it there. Where the network between sandbox and OpenCode is not closed, put a proxy in front of OpenCode that adds the password as HTTP basic auth (user `opencode`), and point `OPENCLAW_OPENCODE_URL` at the proxy.
 

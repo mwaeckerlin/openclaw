@@ -1,6 +1,6 @@
 {
   "name": "@mwaeckerlin/openclaw",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "scripts": {
     "build": "docker compose build",
     "build:doc": "plantuml -tsvg -o doc README.md",
