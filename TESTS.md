@@ -32,6 +32,8 @@ The sandbox toolset and SSH behaviour are tested end to end in the [mwaeckerlin/
 - **F8** `tests/gateway-image.sh` › no_token_in_stored_config, placeholder_token_resolved — `openclaw.json` on the volume holds `${OPENCLAW_GATEWAY_TOKEN}` and never the token, and the running gateway accepts the token it resolved from its environment and refuses a wrong one.
 - **F8** `tests/gateway-image.sh` › credentials_from_docker_secrets — the gateway takes its token and the scoped LiteLLM key from Docker secret files in `/run/secrets`, accepts that token, and writes neither into `openclaw.json`.
 - **F2, F4** `tests/gateway-image.sh` › skills_in_image — the gateway image carries `ssh-sandbox`, `opencode-delegation`, `openclaw-mcp-gateway` and `mcp-github` each in a directory of its own with its `SKILL.md`, and no `SKILL.md` directly in `/app/skills`.
+- **F4** `tests/gateway-image.sh` › device_pairing_preseeded — the gateway started with the `OPENCLAW_DEVICE_PAIRING` that `generate-device-pairing.mjs` writes lists that device as paired (`openclaw devices list`).
+- **F4** `tests/gateway-image.sh` › device_pairing_kept_after_restart — after a restart the device is still listed, and the gateway starts without importing the pairing again.
 
 ## Volume tests
 

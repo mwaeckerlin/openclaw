@@ -30,6 +30,7 @@ NETWORK="openclaw-gateway-image-test-$$"
 STUB="openclaw-litellm-stub-$$"
 VOLUME="openclaw-gateway-image-test-config-$$"
 SECRETS="openclaw-gateway-image-test-secrets-$$"
+PAIRED="openclaw-gateway-image-test-paired-$$"
 SECRETS_DIR="$(mktemp -d)"
 PASS=0
 FAIL=0
@@ -39,7 +40,7 @@ _pass() { PASS=$((PASS + 1)); echo "  PASS  $1"; }
 _fail() { FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1"); echo "  FAIL  $1: $2"; }
 
 cleanup() {
-    docker rm -f "${NAME}" "${STUB}" "${SECRETS}" >/dev/null 2>&1
+    docker rm -f "${NAME}" "${STUB}" "${SECRETS}" "${PAIRED}" >/dev/null 2>&1
     docker network rm "${NETWORK}" >/dev/null 2>&1
     docker volume rm "${VOLUME}" >/dev/null 2>&1
     rm -rf "${SECRETS_DIR}"
@@ -249,6 +250,34 @@ else
         _pass "credentials_from_docker_secrets"
     else
         _fail "credentials_from_docker_secrets" "$(docker logs --tail 20 "${SECRETS}" 2>&1)"
+    fi
+
+    # the device pairing of the MCP gateway, as generate-device-pairing.mjs
+    # writes it: the gateway lists the device as paired, also after a restart,
+    # and the restart does not import it again
+    PAIRING=$(node generate-device-pairing.mjs --stdout | sed -n 's/^OPENCLAW_DEVICE_PAIRING=//p' \
+        | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")))')
+    DEVICE_ID=$(node -e 'process.stdout.write(Object.keys(JSON.parse(process.argv[1]))[0])' "${PAIRING}")
+    docker run -d --name "${PAIRED}" --network none "${BASE_ENV[@]}" -e "OPENCLAW_DEVICE_PAIRING=${PAIRING}" "${IMAGE}" >/dev/null
+    DEVICES=""
+    wait_healthy "${PAIRED}" \
+        && DEVICES=$(docker exec "${PAIRED}" node openclaw.mjs devices list --json --url ws://127.0.0.1:18789 --token test-token 2>&1)
+    if [[ "${DEVICES}" == *"${DEVICE_ID}"* ]]; then
+        _pass "device_pairing_preseeded"
+    else
+        _fail "device_pairing_preseeded" "device ${DEVICE_ID} not listed: $(echo "${DEVICES}" | tail -n 10) $(docker logs --tail 15 "${PAIRED}" 2>&1)"
+    fi
+    docker restart "${PAIRED}" >/dev/null
+    DEVICES=""
+    wait_healthy "${PAIRED}" \
+        && DEVICES=$(docker exec "${PAIRED}" node openclaw.mjs devices list --json --url ws://127.0.0.1:18789 --token test-token 2>&1)
+    # the log is read whole before it is searched: under pipefail, a grep
+    # that stops at its first hit fails the docker logs that still writes
+    PAIRED_LOG=$(docker logs "${PAIRED}" 2>&1)
+    if [[ "${DEVICES}" == *"${DEVICE_ID}"* && "${PAIRED_LOG}" == *"state already migrated"* ]]; then
+        _pass "device_pairing_kept_after_restart"
+    else
+        _fail "device_pairing_kept_after_restart" "$(echo "${DEVICES}" | tail -n 5) $(grep -A3 'Migrating OpenClaw State' <<<"${PAIRED_LOG}")"
     fi
 fi
 

@@ -189,7 +189,7 @@ If you use the MCP gateway (enabled by default), generate a device keypair for s
 node generate-device-pairing.mjs
 ```
 
-This appends `OPENCLAW_DEVICE_IDENTITY` and `OPENCLAW_DEVICE_PAIRING` to `.env`. The MCP gateway uses the private key to authenticate, and the OpenClaw gateway pre-registers the public key so the device is trusted on first connect.
+This appends `OPENCLAW_DEVICE_IDENTITY` and `OPENCLAW_DEVICE_PAIRING` to `.env`. The MCP gateway uses the private key to authenticate, and the OpenClaw gateway pre-registers the public key so the device is trusted on first connect. The gateway imports a new pairing with `openclaw doctor --fix --non-interactive` at its start, once; a pairing it already holds is not imported again.
 
 Use `--stdout` to print the values instead of writing to `.env`.
 

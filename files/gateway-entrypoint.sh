@@ -74,12 +74,21 @@ else
 fi
 normalize_provider_models ~/.openclaw/openclaw.json
 
+_pairing_pending=""
 if [ -n "$OPENCLAW_DEVICE_PAIRING" ]; then
   echo "==== Pre-Seeding Device Pairing ===="
   _state_dir="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
   mkdir -p "$_state_dir/devices"
-  printf '%b' "$OPENCLAW_DEVICE_PAIRING" > "$_state_dir/devices/paired.json"
-  echo "Device pairing written to $_state_dir/devices/paired.json"
+  # OpenClaw takes devices/paired.json into its database only through its
+  # doctor (below), which keeps the file afterwards as paired.json.migrated;
+  # a pairing that is already in the database is not written again
+  if [ "$(printf '%b' "$OPENCLAW_DEVICE_PAIRING")" = "$(cat "$_state_dir/devices/paired.json.migrated" 2>/dev/null)" ]; then
+    echo "Device pairing already imported"
+  else
+    printf '%b' "$OPENCLAW_DEVICE_PAIRING" > "$_state_dir/devices/paired.json"
+    _pairing_pending=yes
+    echo "Device pairing written to $_state_dir/devices/paired.json"
+  fi
 fi
 
 # discovery asks LITELLM_URL, else the base URL the provider uses, with the
@@ -337,15 +346,16 @@ fi
 echo "==== Migrating OpenClaw State ===="
 # OpenClaw refuses to start on state an older release wrote ("run openclaw
 # doctor --fix to migrate it"), so its doctor migrates that state without
-# prompts, once per release; a fresh volume holds no state yet, and the
-# gateway creates it in the schema of the release it runs
+# prompts, once per release, and imports a newly written device pairing; a
+# fresh volume without a pairing holds no state yet, and the gateway creates
+# it in the schema of the release it runs
 _state_dir="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
 _release="$(node openclaw.mjs --version)"
 _migrated="$_state_dir/.migrated-release"
-if [ ! -e "$_state_dir/state/openclaw.sqlite" ]; then
+if [ -z "$_pairing_pending" ] && [ ! -e "$_state_dir/state/openclaw.sqlite" ]; then
   echo "no state yet"
   printf '%s\n' "$_release" > "$_migrated"
-elif [ "$(cat "$_migrated" 2>/dev/null)" = "$_release" ]; then
+elif [ -z "$_pairing_pending" ] && [ "$(cat "$_migrated" 2>/dev/null)" = "$_release" ]; then
   echo "state already migrated to $_release"
 elif node openclaw.mjs doctor --fix --non-interactive; then
   printf '%s\n' "$_release" > "$_migrated"

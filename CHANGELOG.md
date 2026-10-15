@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-15 **1.1.8**
+    - The device pairing from `OPENCLAW_DEVICE_PAIRING` reaches the gateway again: since OpenClaw 2026.10 the gateway reads the pairing file only through `openclaw doctor`, so the MCP gateway was refused with «device is not approved yet»; the gateway now imports a new pairing at its start, once
+
 - 2026-10-15 **1.1.7**
     - The gateway starts again on the volume of an existing installation: OpenClaw refuses to start on the state an older release wrote, so the gateway now migrates that state once per OpenClaw release with `openclaw doctor --fix --non-interactive` before it starts, and the agents' conversations are kept
     - The sandbox starts again on a workspace volume whose `workspaces/skills` is a link to the image's skills: the skill installation deleted the image's skills through the link and stopped with «are the same file»; the link is now replaced by a real directory on the volume
