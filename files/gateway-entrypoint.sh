@@ -334,6 +334,26 @@ if [ -n "$GEMINI_API_KEY" ] && [ -z "$OPENCLAW_GEMINI_MODELS_JSON" ]; then
   fi
 fi
 
+echo "==== Migrating OpenClaw State ===="
+# OpenClaw refuses to start on state an older release wrote ("run openclaw
+# doctor --fix to migrate it"), so its doctor migrates that state without
+# prompts, once per release; a fresh volume holds no state yet, and the
+# gateway creates it in the schema of the release it runs
+_state_dir="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+_release="$(node openclaw.mjs --version)"
+_migrated="$_state_dir/.migrated-release"
+if [ ! -e "$_state_dir/state/openclaw.sqlite" ]; then
+  echo "no state yet"
+  printf '%s\n' "$_release" > "$_migrated"
+elif [ "$(cat "$_migrated" 2>/dev/null)" = "$_release" ]; then
+  echo "state already migrated to $_release"
+elif node openclaw.mjs doctor --fix --non-interactive; then
+  printf '%s\n' "$_release" > "$_migrated"
+  echo "state migrated to $_release"
+else
+  echo "WARN: openclaw doctor could not migrate the state completely, the gateway reports what is left; the next start tries again" >&2
+fi
+
 if [ -n "$PLUGINS" ]; then
   echo "==== Install Plugins ===="
   echo "Plugins to install: $PLUGINS"

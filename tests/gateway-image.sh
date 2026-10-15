@@ -78,15 +78,26 @@ else
     # the layers of the official image the build pulled must open the layer
     # list of the gateway image; a source label proves nothing, a copy built
     # from the upstream Dockerfile carries the same one. BuildKit keeps the
-    # base it pulled in its own cache, so on a fresh runner the image store
-    # does not hold it and it is pulled here for the comparison
-    docker image inspect "${BASE_IMAGE}" >/dev/null 2>&1 || docker pull --quiet "${BASE_IMAGE}" >/dev/null
+    # base it pulled in its own cache, so the image store holds none or an
+    # older release under the same tag; it is pulled here for the comparison
+    docker pull --quiet "${BASE_IMAGE}" >/dev/null
     BASE_LAYERS=$(docker image inspect --format '{{join .RootFS.Layers " "}}' "${BASE_IMAGE}" 2>/dev/null)
     IMAGE_LAYERS=$(docker image inspect --format '{{join .RootFS.Layers " "}}' "${IMAGE}")
     if [[ -n "${BASE_LAYERS}" && "${IMAGE_LAYERS}" == "${BASE_LAYERS}"* ]]; then
         _pass "official_openclaw_base"
     else
         _fail "official_openclaw_base" "${IMAGE} is not built on the layers of ${BASE_IMAGE}"
+    fi
+
+    # the skills of this image each in a directory of their own beside the
+    # skills OpenClaw ships; a SKILL.md directly in /app/skills is one copied
+    # over the other
+    SKILLS=$(docker run --rm --network none --entrypoint sh "${IMAGE}" -c \
+        'for skill in ssh-sandbox opencode-delegation openclaw-mcp-gateway mcp-github; do [ -f "/app/skills/$skill/SKILL.md" ] || echo "missing $skill"; done; [ -e /app/skills/SKILL.md ] && echo "stray /app/skills/SKILL.md"' 2>&1)
+    if [[ -z "${SKILLS}" ]]; then
+        _pass "skills_in_image"
+    else
+        _fail "skills_in_image" "$(echo "${SKILLS}" | tr '\n' ' ')"
     fi
 
     VERSION=$(docker run --rm --network none --entrypoint node "${IMAGE}" openclaw.mjs --version 2>&1)

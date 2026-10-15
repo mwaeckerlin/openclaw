@@ -69,7 +69,7 @@ Note: If networks are neither segregated nor encrypted, the agent can *sniff for
 
 ### Secrets
 
-- **Secrets** (production) — Use docker secrets instead of environment variables in docker swarm (or use a vault such as Hashicorps to deploy in e.g. Kubernetes). Secrets can be mounted on `/var/secrets/secret-name` and are then exported to the OpenClaw environment variables as `SECRET_NAME`.
+- **Secrets** (production) — Use docker secrets instead of environment variables in docker swarm (or use a vault such as Hashicorps to deploy in e.g. Kubernetes). Docker mounts each secret as `/run/secrets/secret-name`, and the gateway exports it to the OpenClaw environment as `SECRET_NAME`.
 
 ### Additional Tools and Segregations
 
@@ -219,13 +219,17 @@ npm run build
 npm test
 ```
 
-`npm test` checks the feature and test registers, runs the unit tests of the configuration renderer (secret escaping, template defaults), checks the wiring of `docker-compose.yml`, and tests the built gateway image: for each group of environment variables, OpenClaw itself validates the rendered configuration, and the gateway has to start and answer `/healthz`. Finally it starts gateway and sandbox together with test credentials and checks that the agent gets no tool to request or reach a credential and that the sandbox holds none. All tests are listed in [TESTS.md](TESTS.md).
+`npm test` checks the feature and test registers, runs the unit tests of the configuration renderer (secret escaping, template defaults), checks the wiring of `docker-compose.yml`, and tests the built gateway image: for each group of environment variables, OpenClaw itself validates the rendered configuration, and the gateway has to start and answer `/healthz`. The gateway also has to start on the state the former OpenClaw releases of this image wrote, with the agent's conversation kept, and the sandbox has to start again and again on its filled workspace volume. Finally it starts gateway and sandbox together with test credentials and checks that the agent gets no tool to request or reach a credential and that the sandbox holds none. All tests are listed in [TESTS.md](TESTS.md).
 
 ### 5. Images and Publishing
 
 The gateway image `mwaeckerlin/openclaw:gateway` builds on the official [`openclaw/openclaw`](https://hub.docker.com/r/openclaw/openclaw) image, so every build takes the current OpenClaw release. The sandbox image `mwaeckerlin/openclaw:sandbox` builds on [mwaeckerlin/sandbox-base](https://github.com/mwaeckerlin/sandbox-base).
 
 GitHub Actions ([.github/workflows/docker.yml](.github/workflows/docker.yml)) builds both images on every push and every Monday for amd64 and arm64, runs `npm test`, and publishes them on Docker Hub with the reusable workflow of [mwaeckerlin/scratch](https://github.com/mwaeckerlin/scratch). Besides `gateway` and `sandbox`, each image carries the tags `<tag>-YYYYMMDD`, `<tag>-<version>` and `<tag>-<version>-YYYYMMDD`, the version taken from `package.json`. `npm run deploy` pushes the locally built images.
+
+## Upgrades
+
+A new image can carry a new OpenClaw release, and OpenClaw refuses to start on state an older release wrote. The gateway therefore migrates the state on the `openclaw-config` volume with `openclaw doctor --fix --non-interactive` before it starts, once per OpenClaw release; `.migrated-release` on the volume names the release it was migrated to, and the database before the migration stays beside it as `state/openclaw.sqlite.pre-startup-migration-*.bak`. A first start on a new installation has nothing to migrate.
 
 ## Full Configuration Guide
 
@@ -239,7 +243,7 @@ The gateway entrypoint iterates over all files in `/run/secrets/` and exports ea
 | `OPENCLAW_SANDBOX_SSH_PRIVATE_KEY` | `openclaw_sandbox_ssh_private_key` | `openclaw-sandbox-ssh-private-key` |
 | … | … | … |
 
-The sandbox reads its public key directly from `/run/secrets/openclaw_sandbox_ssh_public_key` or alternatively `/run/secrets/openclaw-sandbox-ssh-public-key` (fallback when `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY` is not set, `-` and `_` are interchangeable).
+The sandbox reads its public key from `OPENCLAW_SANDBOX_SSH_PUBLIC_KEY`, and where that is not set, from `/run/secrets/openclaw_sandbox_ssh_public_key`; the sandbox maps no other secret.
 
 This means *any* Docker Secret is automatically available as an environment variable — no explicit mapping required. Secrets take precedence over environment variables.
 
@@ -292,7 +296,7 @@ No secret value is written into `openclaw.json`: the rendered configuration keep
 
 ### LiteLLM Configuration
 
-When `LITELLM_BASE_URL` or `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the default model switches to `litellm/openrouter/~moonshotai/kimi-latest`. Without LiteLLM, OpenClaw uses `openrouter/~moonshotai/kimi-latest` when `OPENROUTER_API_KEY` is set, otherwise `openai/gpt-4.6`.
+When `LITELLM_BASE_URL`, `LITELLM_API_KEY` or `LITELLM_MASTER_KEY` is set, LiteLLM is enabled as model provider and the default model switches to `litellm/openrouter/~moonshotai/kimi-latest`. Without LiteLLM, OpenClaw uses `openrouter/~moonshotai/kimi-latest` when `OPENROUTER_API_KEY` is set, otherwise `openai/gpt-4.6`.
 
 Without a key in the gateway: set only `LITELLM_BASE_URL` to a proxy in front of LiteLLM that puts the credential (a scoped virtual key) into the `Authorization` header. OpenClaw sends no provider request without some key, so the gateway sends the fixed public value `Bearer proxy-supplied`, which the proxy replaces; model discovery sends no header. The gateway container then needs no `litellm_master_key` secret.
 
@@ -411,7 +415,7 @@ Special case:
 Model handling:
 
 - Agent model mappings can be set via `OPENCLAW_AGENT_MODELS_JSON`.
-- Provider model catalogs are managed per provider (`models.providers.*.models`), including LiteLLM discovery via `LITELLM_URL` + `LITELLM_MASTER_KEY`.
+- Provider model catalogs are managed per provider (`models.providers.*.models`), including LiteLLM discovery via `LITELLM_URL` with `LITELLM_API_KEY`, `LITELLM_MASTER_KEY` or, behind a proxy, no key.
 
 For a full technical variable reference, use the gateway service environment block in `docker-compose.yml` and the template defaults in `files/openclaw.json.j2`.
 

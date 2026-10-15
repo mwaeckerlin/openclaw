@@ -13,8 +13,8 @@ ENV CONTAINERNAME="openclaw"
 COPY --from=opencode /usr/local/bin/opencode /usr/local/bin/opencode
 COPY --chmod=0755 files/opencode-delegate /usr/local/bin/opencode-delegate
 ADD https://github.com/mwaeckerlin/ai-agent-skills.git#master:skills /app/skills/
-COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/
-COPY --from=mcp_github_skills /app/skills/mcp-github /app/skills/
+COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/openclaw-mcp-gateway
+COPY --from=mcp_github_skills /app/skills/mcp-github /app/skills/mcp-github
 ADD files/sandbox-entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 

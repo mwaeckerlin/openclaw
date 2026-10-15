@@ -8,8 +8,21 @@ fi
 [ -d ${RUN_HOME}/.ssh ] || mkdir -p ${RUN_HOME}/.ssh
 echo "$key" > ${RUN_HOME}/.ssh/authorized_keys
 echo "==== Installing Skills to Existing Workspaces ===="
+home_real="$(realpath "${RUN_HOME}")"
 for workspace_skills in "${RUN_HOME}/workspaces" "${RUN_HOME}"/workspaces/*/workspace; do
   [ -d "$workspace_skills" ] || continue
+  # skills are only written into the volume: a skills directory that is a link
+  # out of it (to the image's /app/skills) becomes a real directory, because
+  # copying through the link deletes the image's skills and copies each one
+  # onto itself; a workspace that leads out of the volume is left alone
+  if [ -L "$workspace_skills"/skills ] && [[ "$(realpath -m "$workspace_skills"/skills)/" != "$home_real"/* ]]; then
+    echo "replacing the link $workspace_skills/skills -> $(readlink "$workspace_skills"/skills) by a directory"
+    rm "$workspace_skills"/skills
+  fi
+  if [[ "$(realpath "$workspace_skills")/" != "$home_real"/* ]]; then
+    echo "WARN: $workspace_skills leads out of ${RUN_HOME}, no skills installed there" >&2
+    continue
+  fi
   [ -d "$workspace_skills"/skills ] || mkdir -p "$workspace_skills"/skills
   for source_dir in /app/skills/*; do
     [ -d "$source_dir" ] || continue

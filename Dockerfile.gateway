@@ -14,8 +14,8 @@ ADD files/openclaw.json.j2 /openclaw.json.j2.default
 ADD files/SKILL.md /app/skills/ssh-sandbox/SKILL.md
 ADD files/opencode-delegation/SKILL.md /app/skills/opencode-delegation/SKILL.md
 ADD https://github.com/mwaeckerlin/ai-agent-skills.git#master:skills /app/skills/
-COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/
-COPY --from=mcp_github_skills /app/skills/mcp-github /app/skills/
+COPY --from=mcp_gateway_skills /app/skills/openclaw-mcp-gateway /app/skills/openclaw-mcp-gateway
+COPY --from=mcp_github_skills /app/skills/mcp-github /app/skills/mcp-github
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=60 \
   CMD node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/entrypoint.sh"]

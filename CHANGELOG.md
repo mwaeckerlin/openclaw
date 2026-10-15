@@ -1,5 +1,11 @@
 # Changelog
 
+- 2026-10-15 **1.1.7**
+    - The gateway starts again on the volume of an existing installation: OpenClaw refuses to start on the state an older release wrote, so the gateway now migrates that state once per OpenClaw release with `openclaw doctor --fix --non-interactive` before it starts, and the agents' conversations are kept
+    - The sandbox starts again on a workspace volume whose `workspaces/skills` is a link to the image's skills: the skill installation deleted the image's skills through the link and stopped with «are the same file»; the link is now replaced by a real directory on the volume
+    - The MCP gateway and GitHub skills reach both images again, each in a directory of its own; before, each image carried a single `SKILL.md` directly in `/app/skills` that the GitHub skill had written over the MCP gateway skill
+    - README corrected: Docker mounts secrets under `/run/secrets`, the sandbox reads only the secret `openclaw_sandbox_ssh_public_key`, and `LITELLM_API_KEY` alone also enables LiteLLM; the new section «Upgrades» describes the state migration
+
 - 2026-09-29 **1.1.6**
     - A delegation to OpenCode that fails now says why: an unreachable server and a refused call (for example a server that requires a password) end with their own message and exit code instead of a parser error
     - A delegation no longer waits forever on a server that does not answer: it stops after `OPENCLAW_OPENCODE_TIMEOUT` seconds (default 7200) with a message

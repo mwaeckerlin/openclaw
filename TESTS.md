@@ -31,6 +31,19 @@ The sandbox toolset and SSH behaviour are tested end to end in the [mwaeckerlin/
 - **F8** `tests/gateway-image.sh` › litellm_called_without_key — with `LITELLM_BASE_URL` alone, a model call reaches a recording OpenAI-compatible endpoint and carries only the public placeholder `Bearer proxy-supplied`, model discovery carries no header at all.
 - **F8** `tests/gateway-image.sh` › no_token_in_stored_config, placeholder_token_resolved — `openclaw.json` on the volume holds `${OPENCLAW_GATEWAY_TOKEN}` and never the token, and the running gateway accepts the token it resolved from its environment and refuses a wrong one.
 - **F8** `tests/gateway-image.sh` › credentials_from_docker_secrets — the gateway takes its token and the scoped LiteLLM key from Docker secret files in `/run/secrets`, accepts that token, and writes neither into `openclaw.json`.
+- **F2, F4** `tests/gateway-image.sh` › skills_in_image — the gateway image carries `ssh-sandbox`, `opencode-delegation`, `openclaw-mcp-gateway` and `mcp-github` each in a directory of its own with its `SKILL.md`, and no `SKILL.md` directly in `/app/skills`.
+
+## Volume tests
+
+`npm run test:migration` runs against the built gateway image, `npm run test:sandbox` against the built sandbox image (`npm run build` first).
+
+- **F5** `tests/state-migration.sh` › state_of_2026.6.9_migrated, state_of_2026.9.6_migrated — for each former OpenClaw release of this image (`alpine/openclaw:2026.6.9`, `openclaw/openclaw:2026.9.6`), that release writes its configuration and holds one agent turn against the recording endpoint of `tests/openai-stub.cjs` on a fresh volume; the gateway image then starts on that volume and answers `/healthz`.
+- **F5** `tests/state-migration.sh` › session_of_2026.6.9_kept, session_of_2026.9.6_kept — after the migration, `openclaw sessions` still lists the agent's session.
+- **F8** `tests/state-migration.sh` › no_token_after_migration_of_2026.6.9, no_token_after_migration_of_2026.9.6 — `openclaw.json` and the backup the migration writes hold `${OPENCLAW_GATEWAY_TOKEN}` and never the token.
+- **F5** `tests/state-migration.sh` › restart_after_2026.6.9_without_migration, restart_after_2026.9.6_without_migration — a restart on the migrated volume starts without migrating again.
+- **F2, F4** `tests/sandbox-image.sh` › skills_in_image — every skill of the sandbox image lies in a directory of its own with its `SKILL.md`, `openclaw-mcp-gateway` and `mcp-github` included, and no `SKILL.md` lies directly in `/app/skills`.
+- **F2, F5** `tests/sandbox-image.sh` › first_start_installs_skills, second_start_on_filled_volume — the sandbox starts on a fresh workspace volume with the media volume below it, as the stack mounts them, installs every skill into `workspaces/skills` and starts sshd; it does the same a second time on the filled volumes.
+- **F5** `tests/sandbox-image.sh` › linked_skills_directory — on a volume whose `workspaces/skills` is a link to `/app/skills`, the sandbox starts, installs the skills into a real directory on the volume, and the image's skills keep their `SKILL.md`.
 
 ## Contract and data flow tests
 
@@ -41,9 +54,9 @@ The sandbox toolset and SSH behaviour are tested end to end in the [mwaeckerlin/
 - **F8** `tests/render-config.test.mjs` › no secret value is written into openclaw.json, only its placeholder; secret values containing JSON or template syntax never reach the configuration; litellm is enabled by its base URL alone and then carries no key; a scoped LiteLLM key and the Hindsight key reach the configuration only as placeholders; the agent has no tool to request a credential and no path out of the sandbox by default.
 - **F1** `tests/compose-contract.sh` › compose_renders, only_mwaeckerlin_images — the stack renders and deploys only mwaeckerlin images.
 - **F2** `tests/compose-contract.sh` › sandbox_from_shared_base, only_dind_privileged — the sandbox builds on the shared base and runs unprivileged.
-- **F2** `tests/compose-contract.sh` › skills_copied — the agent skills are installed into the sandbox image.
+- **F2, F4** `tests/compose-contract.sh` › skills_copied — `Dockerfile.sandbox` copies the skills of the MCP gateway image and of the GitHub MCP image; that they arrive in the image, each in its own directory, is measured by skills_in_image of `tests/sandbox-image.sh`.
 - **F3** `tests/compose-contract.sh` › dind_is_rootless_dockindock, docker_host_port_wired, dind_volume_on_data_root — the sandbox's `DOCKER_HOST` matches the rootless dind service and its port, storage sits on the daemon's real data path.
-- **F4** `tests/compose-contract.sh` › skills_copied — MCP gateway and GitHub skills reach the sandbox; the service URLs are part of the rendered stack (compose_renders).
+- **F4** `tests/compose-contract.sh` › compose_renders — the addresses of the MCP gateway and of the GitHub MCP service are part of the rendered stack.
 - **F5** `tests/compose-contract.sh` › no_foreign_owner_on_config_volume — no service hands the gateway's config volume to another user.
 
 ## Workflow contract

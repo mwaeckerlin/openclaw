@@ -80,8 +80,11 @@ if serve "${SERVER}"; then
     SESSION=$(echo "${ANSWER}" | sed -n 's/^OpenCode session: //p')
     FOLLOW_UP=""
     [[ -n "${SESSION}" ]] && FOLLOW_UP=$(delegate "${SERVER}" --session "${SESSION}" "Reply again with exactly: pong")
-    if [[ "$(echo "${ANSWER}" | head -n 1)" == "pong" && -n "${SESSION}" && "${FOLLOW_UP}" == pong* ]] \
-        && docker logs "${STUB}" 2>&1 | grep -q "Reply again with exactly: pong"; then
+    # the log is read whole before it is searched: under pipefail, a grep
+    # that stops at its first hit fails the docker logs that still writes
+    STUB_LOG=$(docker logs "${STUB}" 2>&1)
+    if [[ "$(echo "${ANSWER}" | head -n 1)" == "pong" && -n "${SESSION}" && "${FOLLOW_UP}" == pong* \
+        && "${STUB_LOG}" == *"Reply again with exactly: pong"* ]]; then
         _pass "task_delegated_and_answered"
     else
         _fail "task_delegated_and_answered" "answer: ${ANSWER}; follow-up: ${FOLLOW_UP}; server log: $(docker logs --tail 10 "${SERVER}" 2>&1)"
