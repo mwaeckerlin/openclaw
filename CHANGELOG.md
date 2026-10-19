@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-19 **1.1.9**
+    - Test suite: `npm run test:hindsight` proves against a real Hindsight that demands its tenant key that the gateway reaches both memory banks with the key of the Docker secret `openclaw_hindsight_api_key`, and neither with a wrong key
+
 - 2026-10-15 **1.1.8**
     - The device pairing from `OPENCLAW_DEVICE_PAIRING` reaches the gateway again: since OpenClaw 2026.10 the gateway reads the pairing file only through `openclaw doctor`, so the MCP gateway was refused with «device is not approved yet»; the gateway now imports a new pairing at its start, once
 

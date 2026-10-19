@@ -19,6 +19,15 @@ The sandbox toolset and SSH behaviour are tested end to end in the [mwaeckerlin/
 - **F9** `tests/opencode-delegation.sh` › password_server_refuses_sandbox — a server with `OPENCODE_SERVER_PASSWORD` refuses the sandbox, which holds no password: `opencode-delegate` ends with exit 5 and the message about HTTP 401, never a parser error, while the server answers a client that has the password.
 - **F9** `tests/opencode-delegation.sh` › unreachable_server_reported, stalled_server_ends_the_wait — an address nobody answers on ends with exit 4 and its message; a server that takes the connection and never answers ends the wait after `OPENCLAW_OPENCODE_TIMEOUT` seconds (3 in the test) with exit 4 and the message.
 
+## Memory tests
+
+`npm run test:hindsight` runs against the built gateway image and a real Hindsight that demands its tenant key (`npm run build` first).
+
+- **F7** `tests/hindsight-banks.sh` › hindsight_refuses_without_the_key — Hindsight answers an MCP request without a key and one with a wrong key with 401, so a session it opens is one that carried the key.
+- **F7** `tests/hindsight-banks.sh` › banks_connect_with_the_secret_key — with the key as the Docker secret `openclaw_hindsight_api_key` and not in the environment the container was started with, an agent turn through the gateway answers, and Hindsight opens an MCP session for each of the banks of `OPENCLAW_HINDSIGHT_SHARED_URL` and `OPENCLAW_HINDSIGHT_OWN_URL` and answers their tool list.
+- **F8** `tests/hindsight-banks.sh` › no_hindsight_key_in_stored_config — `openclaw.json` on the volume holds `Bearer ${OPENCLAW_HINDSIGHT_API_KEY}` and never the key.
+- **F7** `tests/hindsight-banks.sh` › wrong_key_refused — with a wrong key in the secret, the agent turn still answers, and Hindsight opens no session for the gateway.
+
 ## Image tests
 
 `npm run test:image` runs against the built gateway image (`npm run build` first).
