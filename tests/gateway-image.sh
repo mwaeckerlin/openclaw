@@ -31,6 +31,8 @@ STUB="openclaw-litellm-stub-$$"
 VOLUME="openclaw-gateway-image-test-config-$$"
 SECRETS="openclaw-gateway-image-test-secrets-$$"
 PAIRED="openclaw-gateway-image-test-paired-$$"
+BIND_LAN="openclaw-gateway-image-test-lan-$$"
+BIND_LOOPBACK="openclaw-gateway-image-test-loopback-$$"
 SECRETS_DIR="$(mktemp -d)"
 PASS=0
 FAIL=0
@@ -40,7 +42,7 @@ _pass() { PASS=$((PASS + 1)); echo "  PASS  $1"; }
 _fail() { FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1"); echo "  FAIL  $1: $2"; }
 
 cleanup() {
-    docker rm -f "${NAME}" "${STUB}" "${SECRETS}" "${PAIRED}" >/dev/null 2>&1
+    docker rm -f "${NAME}" "${STUB}" "${SECRETS}" "${PAIRED}" "${BIND_LAN}" "${BIND_LOOPBACK}" >/dev/null 2>&1
     docker network rm "${NETWORK}" >/dev/null 2>&1
     docker volume rm "${VOLUME}" >/dev/null 2>&1
     rm -rf "${SECRETS_DIR}"
@@ -227,6 +229,49 @@ else
         _pass "placeholder_token_resolved"
     else
         _fail "placeholder_token_resolved" "$(docker exec "${NAME}" node openclaw.mjs gateway call health --url ws://127.0.0.1:18789 --token test-token --json 2>&1 | tail -n 10)"
+    fi
+
+    # the bind mode the gateway really listens with: lan answers on the
+    # container's network address, loopback only on 127.0.0.1
+    # reachable: <container> <address> — whether /healthz answers on that address
+    reachable() {
+        docker exec "$1" node -e "fetch('http://$2:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null
+    }
+    address() { docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$1"; }
+    docker run -d --name "${BIND_LAN}" --network "${NETWORK}" "${BASE_ENV[@]}" "${IMAGE}" >/dev/null
+    docker run -d --name "${BIND_LOOPBACK}" --network "${NETWORK}" "${BASE_ENV[@]}" -e OPENCLAW_GATEWAY_BIND=loopback "${IMAGE}" >/dev/null
+    if wait_healthy "${BIND_LAN}" && reachable "${BIND_LAN}" "$(address "${BIND_LAN}")"; then
+        _pass "gateway_binds_lan_by_default"
+    else
+        _fail "gateway_binds_lan_by_default" "$(docker logs --tail 20 "${BIND_LAN}" 2>&1)"
+    fi
+    if wait_healthy "${BIND_LOOPBACK}" && ! reachable "${BIND_LOOPBACK}" "$(address "${BIND_LOOPBACK}")"; then
+        _pass "gateway_bind_from_environment"
+    else
+        _fail "gateway_bind_from_environment" "OPENCLAW_GATEWAY_BIND=loopback still answers on $(address "${BIND_LOOPBACK}"): $(docker logs --tail 20 "${BIND_LOOPBACK}" 2>&1)"
+    fi
+
+    # the sandbox SSH target OpenClaw reads from the rendered configuration
+    # ssh_target: <env…> — the target after the entrypoint rendered the configuration
+    ssh_target() {
+        docker run --rm --network none "${BASE_ENV[@]}" "$@" "${IMAGE}" node openclaw.mjs config get agents.defaults.sandbox.ssh.target 2>&1 | tail -n 1
+    }
+    TARGET=$(ssh_target)
+    if [[ "${TARGET}" == *"somebody@openclaw-sandbox:22"* ]]; then
+        _pass "sandbox_ssh_target_default"
+    else
+        _fail "sandbox_ssh_target_default" "${TARGET}"
+    fi
+    TARGET=$(ssh_target -e OPENCLAW_SANDBOX_SSH_HOST=sandbox.internal -e OPENCLAW_SANDBOX_SSH_USER=agent -e OPENCLAW_SANDBOX_SSH_PORT=2222)
+    if [[ "${TARGET}" == *"agent@sandbox.internal:2222"* ]]; then
+        _pass "sandbox_ssh_target_from_environment"
+    else
+        _fail "sandbox_ssh_target_from_environment" "${TARGET}"
+    fi
+    if ! docker run --rm --network none "${BASE_ENV[@]}" -e "OPENCLAW_SANDBOX_SSH_HOST=-oProxyCommand=id" "${IMAGE}" node openclaw.mjs --version >/dev/null 2>&1; then
+        _pass "invalid_sandbox_ssh_host_refused"
+    else
+        _fail "invalid_sandbox_ssh_host_refused" "the gateway started with an SSH host that is an ssh option"
     fi
 
     # credentials as Docker secret files: the gateway takes its token and the

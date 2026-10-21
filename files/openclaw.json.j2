@@ -112,7 +112,7 @@
         "workspaceAccess": "{{ OPENCLAW_AGENT_WORKSPACE_ACCESS | default('rw', true) }}",
         "sessionToolsVisibility": "{{ OPENCLAW_SESSION_TOOLS_VISIBILITY | default('all', true) }}",
         "ssh": {
-          "target": "somebody@openclaw-sandbox:22",
+          "target": "{{ OPENCLAW_SANDBOX_SSH_USER | default('somebody', true) }}@{{ OPENCLAW_SANDBOX_SSH_HOST | default('openclaw-sandbox', true) }}:{{ OPENCLAW_SANDBOX_SSH_PORT | default('22', true) }}",
           "workspaceRoot": "/home/somebody/workspaces",
           "strictHostKeyChecking": false,
           "identityFile": "/home/node/.ssh/ssh-id-gateway"

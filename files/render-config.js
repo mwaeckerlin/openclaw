@@ -10,9 +10,24 @@ if (!templateFile || !outputFile) {
   process.exit(1);
 }
 
+// values that end up in a command line of OpenClaw (ssh target, bind mode)
+const allowed = {
+  OPENCLAW_GATEWAY_BIND: [/^(loopback|lan|tailnet|auto|custom)$/, 'one of loopback, lan, tailnet, auto, custom'],
+  OPENCLAW_SANDBOX_SSH_HOST: [/^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$/, 'a host name or IPv4 address'],
+  OPENCLAW_SANDBOX_SSH_USER: [/^[A-Za-z_][A-Za-z0-9_.-]*$/, 'a user name'],
+  OPENCLAW_SANDBOX_SSH_PORT: [/^([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$/, 'a port number from 1 to 65535'],
+};
+
 try {
   const template = fs.readFileSync(templateFile, 'utf8');
   const env = process.env;
+
+  for (const [name, [pattern, expected]] of Object.entries(allowed)) {
+    const value = env[name];
+    if (value && !pattern.test(value)) {
+      throw new Error(`${name}=${JSON.stringify(value)} is invalid, it must be ${expected}`);
+    }
+  }
 
   // Configure nunjucks with custom filters
   const nunjucksEnv = new nunjucks.Environment(null, { autoescape: false });
@@ -73,6 +88,11 @@ try {
     for (const entries of pluginEntryMaps) {
       Object.assign(config.plugins.entries, entries);
     }
+  }
+
+  // the gateway takes its bind mode only from here, also under OPENCLAW_GATEWAY_JSON
+  if (config.gateway && typeof config.gateway === 'object' && config.gateway.bind === undefined) {
+    config.gateway.bind = env.OPENCLAW_GATEWAY_BIND || 'lan';
   }
 
   fs.writeFileSync(outputFile, JSON.stringify(config, null, 2));

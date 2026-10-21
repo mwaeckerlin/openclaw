@@ -167,6 +167,45 @@ test("a scoped LiteLLM key and the Hindsight key reach the configuration only as
   }
 });
 
+test("the sandbox SSH target defaults to somebody@openclaw-sandbox:22 and follows OPENCLAW_SANDBOX_SSH_*", () => {
+  assert.equal(renderDefault({}).agents.defaults.sandbox.ssh.target, "somebody@openclaw-sandbox:22");
+  const config = renderDefault({
+    OPENCLAW_SANDBOX_SSH_HOST: "sandbox.internal",
+    OPENCLAW_SANDBOX_SSH_USER: "agent",
+    OPENCLAW_SANDBOX_SSH_PORT: "2222",
+  });
+  assert.equal(config.agents.defaults.sandbox.ssh.target, "agent@sandbox.internal:2222");
+});
+
+test("the gateway binds to lan by default and follows OPENCLAW_GATEWAY_BIND, also under OPENCLAW_GATEWAY_JSON", () => {
+  assert.equal(renderDefault({}).gateway.bind, "lan");
+  assert.equal(renderDefault({ OPENCLAW_GATEWAY_BIND: "loopback" }).gateway.bind, "loopback");
+  const section = '{"mode":"local","port":18789,"auth":{"mode":"token","token":"${OPENCLAW_GATEWAY_TOKEN}"}}';
+  assert.equal(renderDefault({ OPENCLAW_GATEWAY_JSON: section }).gateway.bind, "lan");
+  assert.equal(renderDefault({ OPENCLAW_GATEWAY_JSON: section, OPENCLAW_GATEWAY_BIND: "auto" }).gateway.bind, "auto");
+  assert.equal(renderDefault({ OPENCLAW_GATEWAY_JSON: '{"mode":"local","bind":"loopback"}' }).gateway.bind, "loopback");
+});
+
+test("an invalid sandbox SSH value or bind mode stops the rendering and names the variable", () => {
+  const invalid = {
+    OPENCLAW_SANDBOX_SSH_HOST: "-oProxyCommand=touch /tmp/x",
+    OPENCLAW_SANDBOX_SSH_USER: "a b",
+    OPENCLAW_SANDBOX_SSH_PORT: "65536",
+    OPENCLAW_GATEWAY_BIND: "0.0.0.0",
+  };
+  for (const [name, value] of Object.entries(invalid)) {
+    assert.throws(
+      () => execFileSync("node", [renderScript, defaultTemplate, join(mkdtempSync(join(tmpdir(), "openclaw-render-")), "openclaw.json")], {
+        env: { PATH: process.env.PATH, OPENCLAW_GATEWAY_TOKEN: "test-token", [name]: value },
+        stdio: "pipe",
+      }),
+      (error) => error.status === 1 && error.stderr.toString().includes(name),
+      name,
+    );
+  }
+  assert.equal(renderDefault({ OPENCLAW_SANDBOX_SSH_PORT: "65535" }).agents.defaults.sandbox.ssh.target, "somebody@openclaw-sandbox:65535");
+});
+
 test("the Hindsight banks become MCP servers from the environment", () => {
   const config = renderDefault({
     OPENCLAW_HINDSIGHT_SHARED_URL: "http://hindsight:8888/mcp/shared/",

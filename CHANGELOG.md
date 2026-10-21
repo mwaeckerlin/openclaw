@@ -1,5 +1,10 @@
 # Changelog
 
+- 2026-10-22 **1.1.10**
+    - `OPENCLAW_GATEWAY_BIND` takes effect: the image's start command fixed the bind mode to `lan` and overrode the variable; the default stays `lan`, also where `OPENCLAW_GATEWAY_JSON` replaces the gateway section without a `bind`
+    - The sandbox the gateway connects to is set by `OPENCLAW_SANDBOX_SSH_HOST`, `OPENCLAW_SANDBOX_SSH_USER` and `OPENCLAW_SANDBOX_SSH_PORT` (defaults `openclaw-sandbox`, `somebody`, `22`); an invalid value of these or of `OPENCLAW_GATEWAY_BIND` stops the gateway at its start with a message naming the variable
+    - README: every setting is an environment variable; `OVERWRITE_CONFIG=false` only keeps the file on the volume and is no way to configure the gateway
+
 - 2026-10-19 **1.1.9**
     - Test suite: `npm run test:hindsight` proves against a real Hindsight that demands its tenant key that the gateway reaches both memory banks with the key of the Docker secret `openclaw_hindsight_api_key`, and neither with a wrong key
 

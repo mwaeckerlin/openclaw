@@ -219,7 +219,7 @@ npm run build
 npm test
 ```
 
-`npm test` checks the feature and test registers, runs the unit tests of the configuration renderer (secret escaping, template defaults), checks the wiring of `docker-compose.yml`, and tests the built gateway image: for each group of environment variables, OpenClaw itself validates the rendered configuration, and the gateway has to start and answer `/healthz`. The gateway also has to start on the state the former OpenClaw releases of this image wrote, with the agent's conversation kept, and the sandbox has to start again and again on its filled workspace volume. Finally it starts gateway and sandbox together with test credentials and checks that the agent gets no tool to request or reach a credential and that the sandbox holds none. All tests are listed in [TESTS.md](TESTS.md).
+`npm test` checks the feature and test registers, runs the unit tests of the configuration renderer (secret escaping, template defaults, input validation), checks the wiring of `docker-compose.yml`, and tests the built gateway image: for each group of environment variables, OpenClaw itself validates the rendered configuration, and the gateway has to start and answer `/healthz`. The gateway also has to start on the state the former OpenClaw releases of this image wrote, with the agent's conversation kept, and the sandbox has to start again and again on its filled workspace volume. Finally it starts gateway and sandbox together with test credentials and checks that the agent gets no tool to request or reach a credential and that the sandbox holds none. All tests are listed in [TESTS.md](TESTS.md).
 
 ### 5. Images and Publishing
 
@@ -232,6 +232,8 @@ GitHub Actions ([.github/workflows/docker.yml](.github/workflows/docker.yml)) bu
 A new image can carry a new OpenClaw release, and OpenClaw refuses to start on state an older release wrote. The gateway therefore migrates the state on the `openclaw-config` volume with `openclaw doctor --fix --non-interactive` before it starts, once per OpenClaw release; `.migrated-release` on the volume names the release it was migrated to, and the database before the migration stays beside it as `state/openclaw.sqlite.pre-startup-migration-*.bak`. A first start on a new installation has nothing to migrate.
 
 ## Full Configuration Guide
+
+The gateway renders `openclaw.json` from its environment on every start, so every setting below is an environment variable with a default, and no configuration file is mounted or edited. A value that is not valid for its variable, such as an SSH host that starts with `-`, stops the gateway at its start with a message naming the variable.
 
 ### Automatic Secret Mapping
 
@@ -263,7 +265,11 @@ No secret value is written into `openclaw.json`: the rendered configuration keep
 |---|---|---|
 | `OPENAI_API_KEY` | no | OpenAI API key; enables OpenAI provider, Whisper audio transcription, and is used as default model provider if `LITELLM_MASTER_KEY` is not set |
 | `OPENCLAW_WHISPER_API_KEY` | no | Whisper API key override; if unset and `OPENAI_API_KEY` is set, the rendered configuration uses `OPENAI_API_KEY` for Whisper |
-| `OVERWRITE_CONFIG` | no | Unset/true overwrites `openclaw.json` from the template on startup; set `false` to preserve manual edits |
+| `OVERWRITE_CONFIG` | no | Unset/true renders `openclaw.json` from the environment on every start; `false` keeps the file on the volume as it is, so a changed variable takes no effect any more. Every setting is an environment variable of this section or a `OPENCLAW_<SECTION>_JSON` override, so a change is made in the environment, never in the file |
+| `OPENCLAW_GATEWAY_BIND` | no | Interface the gateway listens on inside its container: `lan` (default, all interfaces, needed for the published port and for the other containers of the stack), `loopback`, `tailnet`, `auto` or `custom`; also applies when `OPENCLAW_GATEWAY_JSON` sets no `bind`. The health check asks `127.0.0.1`, so with `tailnet` the container reports unhealthy |
+| `OPENCLAW_SANDBOX_SSH_HOST` | no | Host name or IPv4 address of the sandbox the gateway connects to by SSH (default: `openclaw-sandbox`) |
+| `OPENCLAW_SANDBOX_SSH_USER` | no | SSH user in the sandbox (default: `somebody`, the user of `mwaeckerlin/openclaw:sandbox`; its home holds the workspaces) |
+| `OPENCLAW_SANDBOX_SSH_PORT` | no | SSH port of the sandbox, 1 to 65535 (default: `22`) |
 | `OPENCLAW_CONFIG_DIR` | no | Host path for config (default: Docker volume) |
 | `OPENCLAW_STATE_DIR` | no | OpenClaw state directory path inside the gateway container (defaults to `~/.openclaw`) |
 | `OPENCLAW_GATEWAY_PORT` | no | Published host port of the gateway (default: 18789) |
