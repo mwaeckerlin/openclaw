@@ -264,6 +264,7 @@ services:
       # memory banks; empty OPENCODE_GATEWAY_URL: no local OpenCode
       OPENCODE_GATEWAY_URL: http://openclaw-opencode-gateway:8080
       OPENCODE_MODELS:
+      OPENCODE_SMALL_MODEL:
       HINDSIGHT_SHARED_BANK:
       HINDSIGHT_OWN_BANK:
     volumes:

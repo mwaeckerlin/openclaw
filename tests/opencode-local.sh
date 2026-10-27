@@ -2,7 +2,7 @@
 # Local OpenCode contract: OpenCode works in the agent's own sandbox, on its
 # checkout, and reaches the model through the gateway that holds the key.
 #
-#   - the entrypoint hands OPENCODE_GATEWAY_URL, OPENCODE_MODELS and the two
+#   - the entrypoint hands OPENCODE_GATEWAY_URL, OPENCODE_MODELS, OPENCODE_SMALL_MODEL and the two
 #     memory banks to the SSH sessions of the agent (/etc/environment), and
 #     nothing that is a key
 #   - in such a session, `opencode run` in a checkout gets the answer of the
@@ -50,6 +50,7 @@ for _ in $(seq 1 30); do
 done
 if grep -qx 'OPENCODE_GATEWAY_URL=http://openclaw-opencode-gateway:8080' <<< "${SESSION_ENV}" \
     && grep -qx 'OPENCODE_MODELS=stub-model' <<< "${SESSION_ENV}" \
+    && grep -qx 'OPENCODE_SMALL_MODEL=stub-small' <<< "${SESSION_ENV}" \
     && grep -qx 'HINDSIGHT_SHARED_BANK=shared' <<< "${SESSION_ENV}" \
     && grep -qx 'HINDSIGHT_OWN_BANK=openclaw' <<< "${SESSION_ENV}"; then
     _pass "gateway_and_models_reach_the_agent"

@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-27 **1.1.12**
+    - The sandbox passes `OPENCODE_SMALL_MODEL` to the OpenCode of the agent, the model of LiteLLM for small tasks such as session titles
+
 - 2026-10-27 **1.1.11**
     - The models of images, of the summary that compacts a long conversation and of the sub-agents are set by `OPENCLAW_IMAGE_MODEL`, `OPENCLAW_COMPACTION_MODEL` and `OPENCLAW_SUBAGENT_MODEL`; unset, OpenClaw takes the primary model as before
     - The agent develops with OpenCode in its own sandbox, on its own checkout, with its tools and its Docker: OpenCode comes with `mwaeckerlin/sandbox-base` and reaches LiteLLM and Hindsight through the new service `openclaw-opencode-gateway`, which holds the keys; the sandbox takes `OPENCODE_GATEWAY_URL`, `OPENCODE_MODELS`, `HINDSIGHT_SHARED_BANK` and `HINDSIGHT_OWN_BANK`

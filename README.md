@@ -337,6 +337,7 @@ The agent hands every software development task to [OpenCode](https://opencode.a
 |---|---|---|
 | `OPENCODE_GATEWAY_URL` | `http://openclaw-opencode-gateway:8080` in the compose file | Gateway of the OpenCode in the sandbox; set on the sandbox service, whose entrypoint exports it to `/etc/environment`; empty: no OpenCode in the sandbox |
 | `OPENCODE_MODELS` | — | Comma separated model names of LiteLLM for the OpenCode in the sandbox, the first is the default; set on the sandbox service |
+| `OPENCODE_SMALL_MODEL` | *(empty)* | Model name of LiteLLM for small tasks of the OpenCode in the sandbox, such as session titles; set on the sandbox service; empty: OpenCode chooses |
 | `HINDSIGHT_SHARED_BANK` | — | Memory bank shared by all agents, MCP server `hindsight-shared` of the OpenCode in the sandbox; set on the sandbox service; empty: none |
 | `HINDSIGHT_OWN_BANK` | — | Memory bank of this agent, MCP server `hindsight-own` of the OpenCode in the sandbox; set on the sandbox service; empty: none |
 | `OPENCLAW_OPENCODE_URL` | — | URL of the central OpenCode server (`opencode serve`, default port 4096), e.g. `http://opencode:4096`; set on the sandbox service; empty: no delegation |
