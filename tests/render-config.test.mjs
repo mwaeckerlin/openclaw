@@ -144,6 +144,24 @@ test("litellm is enabled by its base URL alone and then carries no key", () => {
   assert.equal(config.agents.defaults.model.primary, "litellm/openrouter/~moonshotai/kimi-latest");
 });
 
+test("the models of images, compaction and sub-agents follow the environment and stay unset without it", () => {
+  const unset = renderDefault({ LITELLM_BASE_URL: "http://litellm:4000" }).agents.defaults;
+  assert.equal(unset.imageModel, undefined);
+  assert.equal(unset.compaction, undefined);
+  assert.equal(unset.subagents.model, undefined);
+  const config = renderDefault({
+    LITELLM_BASE_URL: "http://litellm:4000",
+    OPENCLAW_IMAGE_MODEL: "litellm/vision",
+    OPENCLAW_COMPACTION_MODEL: "litellm/summary",
+    OPENCLAW_SUBAGENT_MODEL: 'litellm/coding", "injected": "x',
+  }).agents.defaults;
+  assert.equal(config.imageModel, "litellm/vision");
+  assert.equal(config.compaction.model, "litellm/summary");
+  // a quote in the value stays inside the string and adds no key
+  assert.equal(config.subagents.model, 'litellm/coding", "injected": "x');
+  assert.equal(config.subagents.injected, undefined);
+});
+
 test("the agent has no tool to request a credential and no path out of the sandbox by default", () => {
   const config = renderDefault({});
   assert.deepEqual(config.tools.deny, ["secrets"]);

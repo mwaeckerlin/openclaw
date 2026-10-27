@@ -136,12 +136,23 @@
 {% if OPENCLAW_AGENT_MODELS_JSON | default('') | length > 0 %}
       "models": {{ OPENCLAW_AGENT_MODELS_JSON }},
 {% endif %}
+{% if OPENCLAW_IMAGE_MODEL | default('') | length > 0 %}
+      "imageModel": {{ OPENCLAW_IMAGE_MODEL | dump | safe }},
+{% endif %}
+{% if OPENCLAW_COMPACTION_MODEL | default('') | length > 0 %}
+      "compaction": {
+        "model": {{ OPENCLAW_COMPACTION_MODEL | dump | safe }}
+      },
+{% endif %}
       "heartbeat": {
         "every": "{{ OPENCLAW_HEARTBEAT_INTERVAL | default('0s', true) }}"
       },
       "timeoutSeconds": {{ OPENCLAW_TIMEOUT_SECONDS | default('300', true) | int }},
       "maxConcurrent": {{ OPENCLAW_MAX_CONCURRENT | default('5', true) | int }},
       "subagents": {
+{% if OPENCLAW_SUBAGENT_MODEL | default('') | length > 0 %}
+        "model": {{ OPENCLAW_SUBAGENT_MODEL | dump | safe }},
+{% endif %}
 {% if OPENCLAW_SUBAGENT_TIMEOUT_SECONDS | default('') | length > 0 %}
         "runTimeoutSeconds": {{ OPENCLAW_SUBAGENT_TIMEOUT_SECONDS | int }},
 {% else %}

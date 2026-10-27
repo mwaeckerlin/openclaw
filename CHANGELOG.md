@@ -1,5 +1,11 @@
 # Changelog
 
+- 2026-10-27 **1.1.11**
+    - The models of images, of the summary that compacts a long conversation and of the sub-agents are set by `OPENCLAW_IMAGE_MODEL`, `OPENCLAW_COMPACTION_MODEL` and `OPENCLAW_SUBAGENT_MODEL`; unset, OpenClaw takes the primary model as before
+    - The agent develops with OpenCode in its own sandbox, on its own checkout, with its tools and its Docker: OpenCode comes with `mwaeckerlin/sandbox-base` and reaches LiteLLM and Hindsight through the new service `openclaw-opencode-gateway`, which holds the keys; the sandbox takes `OPENCODE_GATEWAY_URL`, `OPENCODE_MODELS`, `HINDSIGHT_SHARED_BANK` and `HINDSIGHT_OWN_BANK`
+    - The central OpenCode server stays for the work the user follows or takes over in the browser; the skill `opencode-delegation` says which of the two takes a task
+    - `npm test` builds the images before it tests them, so it no longer depends on images left over from an earlier build
+
 - 2026-10-22 **1.1.10**
     - `OPENCLAW_GATEWAY_BIND` takes effect: the image's start command fixed the bind mode to `lan` and overrode the variable; the default stays `lan`, also where `OPENCLAW_GATEWAY_JSON` replaces the gateway section without a `bind`
     - The sandbox the gateway connects to is set by `OPENCLAW_SANDBOX_SSH_HOST`, `OPENCLAW_SANDBOX_SSH_USER` and `OPENCLAW_SANDBOX_SSH_PORT` (defaults `openclaw-sandbox`, `somebody`, `22`); an invalid value of these or of `OPENCLAW_GATEWAY_BIND` stops the gateway at its start with a message naming the variable

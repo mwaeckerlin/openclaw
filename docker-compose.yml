@@ -45,6 +45,11 @@ services:
       LITELLM_BASE_URL:
       # Agent defaults
       OPENCLAW_PRIMARY_MODEL:
+      # models of images, of the compaction summary and of the sub-agents,
+      # provider/model each; unset: the primary model
+      OPENCLAW_IMAGE_MODEL:
+      OPENCLAW_COMPACTION_MODEL:
+      OPENCLAW_SUBAGENT_MODEL:
       OPENCLAW_AGENT_SCOPE:
       OPENCLAW_DM_SCOPE:
       OPENCLAW_SESSION_VISIBILITY:
@@ -254,6 +259,13 @@ services:
       # seconds a delegated task may take before the agent stops waiting
       # (default 7200)
       OPENCLAW_OPENCODE_TIMEOUT:
+      # OpenCode in this sandbox, on the agent's own checkout: the gateway that
+      # adds the keys, the LiteLLM models (the first is the default) and the
+      # memory banks; empty OPENCODE_GATEWAY_URL: no local OpenCode
+      OPENCODE_GATEWAY_URL: http://openclaw-opencode-gateway:8080
+      OPENCODE_MODELS:
+      HINDSIGHT_SHARED_BANK:
+      HINDSIGHT_OWN_BANK:
     volumes:
       - openclaw-workspace:/home/somebody
     security_opt:
@@ -270,6 +282,24 @@ services:
       - sandbox-dind
       - sandbox-mcp-gateway
       - sandbox-mcp-github
+      - sandbox-opencode-gateway
+
+  openclaw-opencode-gateway:
+    # the only container that holds the keys OpenCode in the sandbox uses:
+    # it forwards /v1/… to LiteLLM and /mcp/<bank>/… to Hindsight and sets the
+    # key on the way (see mwaeckerlin/opencode)
+    image: mwaeckerlin/opencode:gateway
+    environment:
+      LITELLM_URL:
+      HINDSIGHT_URL:
+      # files holding the keys, Docker secrets; empty: the upstream takes none
+      LITELLM_API_KEY_FILE:
+      HINDSIGHT_API_KEY_FILE:
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - sandbox-opencode-gateway
 
   openclaw-dind:
     # rootless docker-in-docker (mwaeckerlin base image instead of the
@@ -320,6 +350,7 @@ networks:
   gateway-mcp-gateway:
   sandbox-mcp-gateway:
   sandbox-mcp-github:
+  sandbox-opencode-gateway:
 
 volumes:
   openclaw-config:

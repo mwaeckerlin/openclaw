@@ -1,0 +1,50 @@
+# Stack of tests/opencode-local.sh: the real sandbox with its entrypoint, the
+# real OpenCode gateway that holds a test key, and the recording model endpoint
+# of openai-stub.cjs in the place of LiteLLM. The sandbox reaches the gateway
+# only; the key is a test value of this stack only.
+name: openclaw-opencode-local
+
+services:
+  stub:
+    image: mwaeckerlin/openclaw:sandbox
+    entrypoint: ["node", "/stub.cjs"]
+    configs:
+      - source: stub
+        target: /stub.cjs
+    networks:
+      - services
+
+  openclaw-opencode-gateway:
+    image: mwaeckerlin/opencode:gateway
+    environment:
+      LITELLM_URL: http://stub:4000
+      LITELLM_API_KEY_FILE: /run/secrets/litellm_key
+    secrets:
+      - litellm_key
+    networks:
+      - sandbox
+      - services
+
+  openclaw-sandbox:
+    image: mwaeckerlin/openclaw:sandbox
+    environment:
+      OPENCLAW_SANDBOX_SSH_PUBLIC_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOpenClawOpenCodeLocalTestKeyOnly000000000 test
+      OPENCODE_GATEWAY_URL: http://openclaw-opencode-gateway:8080
+      OPENCODE_MODELS: stub-model
+      HINDSIGHT_SHARED_BANK: shared
+      HINDSIGHT_OWN_BANK: openclaw
+    networks:
+      - sandbox
+
+configs:
+  stub:
+    file: openai-stub.cjs
+
+secrets:
+  litellm_key:
+    environment: OPENCLAW_OPENCODE_LOCAL_KEY
+
+networks:
+  sandbox:
+    internal: true
+  services:

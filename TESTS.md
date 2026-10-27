@@ -19,6 +19,16 @@ The sandbox toolset and SSH behaviour are tested end to end in the [mwaeckerlin/
 - **F9** `tests/opencode-delegation.sh` › password_server_refuses_sandbox — a server with `OPENCODE_SERVER_PASSWORD` refuses the sandbox, which holds no password: `opencode-delegate` ends with exit 5 and the message about HTTP 401, never a parser error, while the server answers a client that has the password.
 - **F9** `tests/opencode-delegation.sh` › unreachable_server_reported, stalled_server_ends_the_wait — an address nobody answers on ends with exit 4 and its message; a server that takes the connection and never answers ends the wait after `OPENCLAW_OPENCODE_TIMEOUT` seconds (3 in the test) with exit 4 and the message.
 
+## OpenCode in the Sandbox
+
+`npm run test:opencode` also runs `tests/opencode-local.sh` against the built sandbox image: the stack `tests/opencode-local.yml` starts the sandbox, the real OpenCode gateway with a test key and the recording model endpoint of `tests/openai-stub.cjs` in the place of LiteLLM.
+
+- **F10** `tests/opencode-local.sh` › gateway_and_models_reach_the_agent — the sandbox, started through its real entrypoint, writes `OPENCODE_GATEWAY_URL`, `OPENCODE_MODELS`, `HINDSIGHT_SHARED_BANK` and `HINDSIGHT_OWN_BANK` into `/etc/environment` for the agent's SSH sessions.
+- **F10** `tests/opencode-local.sh` › memory_banks_through_the_gateway — in such a session, the configuration of OpenCode names both memory banks as MCP servers on the gateway.
+- **F10** `tests/opencode-local.sh` › local_task_answered_through_the_gateway — in such a session, `opencode run` in a fresh git checkout prints the answer of the model, which received the key of the real `mwaeckerlin/opencode:gateway` and never the placeholder the sandbox sent.
+- **F10** `tests/opencode-local.sh` › no_key_in_sandbox — the key of the gateway stands neither in the environment of the sandbox, nor in the configuration of OpenCode, nor in a file of the sandbox.
+- **F10** `tests/compose-contract.sh` › local_opencode_through_its_gateway, opencode_from_sandbox_base — the sandbox names `http://openclaw-opencode-gateway:8080`, shares a network of its own with that gateway, which runs `mwaeckerlin/opencode:gateway`, carries no key variable, and takes OpenCode from `mwaeckerlin/sandbox-base`.
+
 ## Memory tests
 
 `npm run test:hindsight` runs against the built gateway image and a real Hindsight that demands its tenant key (`npm run build` first).
@@ -63,6 +73,7 @@ The sandbox toolset and SSH behaviour are tested end to end in the [mwaeckerlin/
 - **F1** `tests/render-config.test.mjs` › config template rendering — the environment-driven OpenClaw configuration renders correctly from the template.
 - **F4** `tests/render-config.test.mjs` › no proxy is trusted by default, so containers of the stack (the MCP gateway) reach the gateway directly; `OPENCLAW_TRUSTED_PROXIES_JSON` sets the real proxy.
 - **F1** `tests/render-config.test.mjs` › every variable the template reads is passed to the gateway by docker-compose.yml.
+- **F1** `tests/render-config.test.mjs` › the models of images, compaction and sub-agents follow the environment and stay unset without it — `OPENCLAW_IMAGE_MODEL`, `OPENCLAW_COMPACTION_MODEL` and `OPENCLAW_SUBAGENT_MODEL` become `imageModel`, `compaction.model` and `subagents.model`, a quote in the value stays inside the string, and without them OpenClaw takes the primary model.
 - **F1** `tests/render-config.test.mjs` › the sandbox SSH target defaults to somebody@openclaw-sandbox:22 and follows OPENCLAW_SANDBOX_SSH_* — default and override of host, user and port in the rendered target.
 - **F1** `tests/render-config.test.mjs` › the gateway binds to lan by default and follows OPENCLAW_GATEWAY_BIND, also under OPENCLAW_GATEWAY_JSON — default `lan`, the variable, a gateway section without `bind` that takes the default or the variable, and one with `bind` that keeps it.
 - **F1** `tests/render-config.test.mjs` › an invalid sandbox SSH value or bind mode stops the rendering and names the variable — a host starting with `-`, a user with a space, port 65536 and bind `0.0.0.0` each end the rendering with exit 1 and the variable's name; port 65535 passes.

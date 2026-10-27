@@ -328,14 +328,23 @@ Without a key in the gateway: set only `LITELLM_BASE_URL` to a proxy in front of
 
 ### Development with OpenCode
 
-The agent hands every software development task to the central [OpenCode](https://opencode.ai) server of the cluster, which works in its own workspace and is tuned for exactly that. The sandbox carries the OpenCode client, taken from the published [`mwaeckerlin/opencode:sandbox`](https://hub.docker.com/r/mwaeckerlin/opencode) image so that it matches the server's release, and the command `opencode-delegate "<task>"`, which the skill `opencode-delegation` tells the agent to use: it sends the task to OpenCode's HTTP API, waits until OpenCode is done, and prints the answer into the conversation, with the session id for a follow-up (`--session <id>`). `opencode run --attach` reaches the server as well, but in OpenCode 1.18 it prints no answer without a terminal.
+The agent hands every software development task to [OpenCode](https://opencode.ai), the coding agent, which the skill `opencode-delegation` tells it to use. OpenCode runs in two places:
+
+- **In the sandbox**, on the agent's own checkout, with the agent's tools and Docker. OpenCode comes with [mwaeckerlin/sandbox-base](https://github.com/mwaeckerlin/sandbox-base) and reaches the models of LiteLLM and the Hindsight memory banks through the service `openclaw-opencode-gateway`, an instance of `mwaeckerlin/opencode:gateway`. The gateway holds the keys and adds them on the way, so the sandbox holds none. The agent runs `opencode run "<task>"` in the checkout; this is the default whenever `OPENCODE_GATEWAY_URL` is set.
+- **On the central OpenCode server** of the cluster, [mwaeckerlin/opencode](https://github.com/mwaeckerlin/opencode), in the server's own workspace, which the user follows in its web interface. The command `opencode-delegate "<task>"` sends the task to OpenCode's HTTP API, waits until OpenCode is done, and prints the answer into the conversation, with the session id for a follow-up (`--session <id>`). The agent takes this way when the user wants to follow or take over the work in the browser, or when no gateway is set. `opencode run --attach` reaches the server as well, but in OpenCode 1.18 it prints no answer without a terminal.
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENCLAW_OPENCODE_URL` | — | URL of the OpenCode server (`opencode serve`, default port 4096), e.g. `http://opencode:4096`; set on the sandbox service; empty: no delegation |
+| `OPENCODE_GATEWAY_URL` | `http://openclaw-opencode-gateway:8080` in the compose file | Gateway of the OpenCode in the sandbox; set on the sandbox service, whose entrypoint exports it to `/etc/environment`; empty: no OpenCode in the sandbox |
+| `OPENCODE_MODELS` | — | Comma separated model names of LiteLLM for the OpenCode in the sandbox, the first is the default; set on the sandbox service |
+| `HINDSIGHT_SHARED_BANK` | — | Memory bank shared by all agents, MCP server `hindsight-shared` of the OpenCode in the sandbox; set on the sandbox service; empty: none |
+| `HINDSIGHT_OWN_BANK` | — | Memory bank of this agent, MCP server `hindsight-own` of the OpenCode in the sandbox; set on the sandbox service; empty: none |
+| `OPENCLAW_OPENCODE_URL` | — | URL of the central OpenCode server (`opencode serve`, default port 4096), e.g. `http://opencode:4096`; set on the sandbox service; empty: no delegation |
 | `OPENCLAW_OPENCODE_TIMEOUT` | `7200` | Seconds a delegated task may take before `opencode-delegate` stops waiting; set on the sandbox service |
 
-The sandbox reaches OpenCode directly, so it shares a network with the OpenCode server, and nothing else of the stack needs to. OpenCode's optional password (`OPENCODE_SERVER_PASSWORD` on the server) never belongs into the sandbox, because the agent could read it there. Where the network between sandbox and OpenCode is not closed, put a proxy in front of OpenCode that adds the password as HTTP basic auth (user `opencode`), and point `OPENCLAW_OPENCODE_URL` at the proxy.
+The service `openclaw-opencode-gateway` takes `LITELLM_URL` and `HINDSIGHT_URL` (defaults `http://litellm:4000` and `http://hindsight:8888`) and the key files `LITELLM_API_KEY_FILE` and `HINDSIGHT_API_KEY_FILE`, Docker secrets of its own; it shares the network `sandbox-opencode-gateway` with the sandbox and nothing else.
+
+The sandbox reaches the central server directly, so it shares a network with it, and nothing else of the stack needs to. OpenCode's optional password (`OPENCODE_SERVER_PASSWORD` on the server) never belongs into the sandbox, because the agent could read it there. Where the network between sandbox and OpenCode is not closed, put a proxy in front of OpenCode that adds the password as HTTP basic auth (user `opencode`), and point `OPENCLAW_OPENCODE_URL` at the proxy.
 
 When configured, model lists are discovered dynamically from providers:
 
@@ -347,6 +356,9 @@ When configured, model lists are discovered dynamically from providers:
 | Variable | Default | Description |
 |---|---|---|
 | `OPENCLAW_PRIMARY_MODEL` | _(auto)_ | Default LLM model; auto-selects `litellm/openrouter/~moonshotai/kimi-latest` with LiteLLM, `openrouter/~moonshotai/kimi-latest` with OpenRouter, else `openai/gpt-4.6` |
+| `OPENCLAW_IMAGE_MODEL` | _(primary)_ | Model that reads images, `provider/model` such as `litellm/vision` |
+| `OPENCLAW_COMPACTION_MODEL` | _(primary)_ | Model that summarises a long conversation, `provider/model` such as `litellm/summary` |
+| `OPENCLAW_SUBAGENT_MODEL` | _(primary)_ | Model of the sub-agents the agent starts, `provider/model` such as `litellm/coding` |
 | `OPENCLAW_HEARTBEAT_INTERVAL` | `0s` | Duration for agent heartbeat (e.g. `30m`, `2h`, `0s` = disabled) |
 | `OPENCLAW_TIMEOUT_SECONDS` | `300` | Agent execution timeout in seconds |
 | `OPENCLAW_MAX_CONCURRENT` | `5` | Maximum concurrent agents |

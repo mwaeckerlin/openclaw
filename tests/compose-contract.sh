@@ -73,6 +73,26 @@ else
         _fail "skills_copied" "MCP skills not copied into the sandbox"
     fi
 
+    # OpenCode in the sandbox reaches its gateway, which alone holds the keys
+    OPENCODE=$(docker compose config --format json | python3 -c '
+import json, sys
+services = json.load(sys.stdin)["services"]
+sandbox, gateway = services["openclaw-sandbox"], services.get("openclaw-opencode-gateway", {})
+shared = set(sandbox.get("networks") or {}) & set(gateway.get("networks") or {})
+keys = [k for k in (sandbox.get("environment") or {}) if "KEY" in k and "SSH" not in k]
+print(sandbox["environment"].get("OPENCODE_GATEWAY_URL"), gateway.get("image"), ",".join(sorted(shared)), ",".join(keys) or "-")')
+    if [[ "${OPENCODE}" == "http://openclaw-opencode-gateway:8080 mwaeckerlin/opencode:gateway sandbox-opencode-gateway -" ]]; then
+        _pass "local_opencode_through_its_gateway"
+    else
+        _fail "local_opencode_through_its_gateway" "gateway URL, gateway image, shared network, keys in the sandbox: ${OPENCODE}"
+    fi
+
+    if ! grep -q 'mwaeckerlin/opencode:sandbox' Dockerfile.sandbox; then
+        _pass "opencode_from_sandbox_base"
+    else
+        _fail "opencode_from_sandbox_base" "Dockerfile.sandbox still takes OpenCode from mwaeckerlin/opencode:sandbox"
+    fi
+
     # no service may take over the gateway's config volume: the gateway
     # writes it as node, and an ownership bootstrap for another user locks it
     # out (tested end to end in tests/gateway-image.sh, fresh_volume_writable)
